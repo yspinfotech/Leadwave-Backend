@@ -1,9 +1,24 @@
 const jwt = require("jsonwebtoken");
+const crypto = require("crypto");
 const User = require("../models/User");
+const RefreshToken = require("../models/RefreshToken");
+
+/* Generate Access Token */
+const generateAccessToken = (user) => {
+  return jwt.sign(
+    {
+      id: user._id,
+      role: user.role,
+      companyId: user.companyId || null,
+    },
+    process.env.JWT_SECRET,
+    { expiresIn: "15m" }, // short-lived
+  );
+};
 
 /**
  * @route   POST /api/auth/login
- * @desc    Login user & return JWT token
+ * @desc    Login user & issue tokens
  * @access  Public
  */
 exports.login = async (req, res) => {
@@ -19,35 +34,27 @@ exports.login = async (req, res) => {
 
     const user = await User.findOne({ email }).select("+password");
 
-    if (!user) {
+    if (!user || !(await user.comparePassword(password))) {
       return res.status(401).json({
         success: false,
         message: "Invalid credentials",
       });
     }
 
-    const isMatch = await user.comparePassword(password);
+    const accessToken = generateAccessToken(user);
 
-    if (!isMatch) {
-      return res.status(401).json({
-        success: false,
-        message: "Invalid credentials",
-      });
-    }
+    const refreshToken = crypto.randomBytes(40).toString("hex");
 
-    const payload = {
-      id: user._id,
-      role: user.role,
-      companyId: user.companyId || null,
-    };
-
-    const token = jwt.sign(payload, process.env.JWT_SECRET, {
-      expiresIn: "1d",
+    await RefreshToken.create({
+      user: user._id,
+      token: refreshToken,
+      expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days
     });
 
     res.status(200).json({
       success: true,
-      token: `Bearer ${token}`,
+      accessToken: `Bearer ${accessToken}`,
+      refreshToken,
     });
   } catch (error) {
     console.error(error);

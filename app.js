@@ -33,6 +33,7 @@ require("./config/passport")(passport);
 app.use("/api/auth", require("./routes/authRoutes"));
 app.use("/api/companies", require("./routes/companyRoutes"));
 app.use("/api/users", require("./routes/userRoutes"));
+app.use("/api/leads", require("./routes/leadRoutes"));
 
 /* =========================
    Health Check
