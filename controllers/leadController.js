@@ -1,3 +1,4 @@
+const mongoose = require("mongoose");
 const Lead = require("../models/Lead");
 const { LEAD_SOURCE, LEAD_STATUS } = require("../config/leadEnums");
 
@@ -67,5 +68,69 @@ exports.createLeadFromForm = async (req, res) => {
       success: false,
       message: "Server error",
     });
+  }
+};
+
+/**
+ * @route   GET /api/leads
+ * @desc    Get leads for the authenticated user's company (paginated)
+ * @access  Authenticated users
+ */
+exports.getLeads = async (req, res) => {
+  try {
+    const page = parseInt(req.query.page, 10) || 1;
+    const limit = 10;
+    const skip = (page - 1) * limit;
+
+    const companyIdRaw = req.user && req.user.companyId;
+    console.log("companyId (raw):", companyIdRaw, "type:", typeof companyIdRaw);
+
+    // Try to cast companyId to ObjectId for reliable matching
+    let companyId;
+    try {
+      companyId = mongoose.Types.ObjectId(companyIdRaw);
+    } catch (e) {
+      companyId = companyIdRaw;
+    }
+
+    // Match companyId whether stored as ObjectId or string
+    const filter = {
+      $and: [
+        { isDeleted: false },
+        {
+          $or: [{ companyId }, { companyId: companyId.toString() }],
+        },
+      ],
+    };
+    console.log("Lead query filter:", JSON.stringify(filter));
+
+    // Diagnostic: also check if any docs exist where companyId is stored as string
+    const stringIdCount = await Lead.countDocuments({
+      companyId: companyId.toString(),
+      isDeleted: false,
+    });
+    console.log("Leads with companyId as string:", stringIdCount);
+
+    const [total, leads] = await Promise.all([
+      Lead.countDocuments(filter),
+      Lead.find(filter).sort({ created: -1 }).skip(skip).limit(limit),
+    ]);
+    console.log("Lead query total:", total);
+
+    const totalPages = Math.ceil(total / limit) || 1;
+
+    res.status(200).json({
+      success: true,
+      data: leads,
+      meta: {
+        page,
+        limit,
+        total,
+        totalPages,
+      },
+    });
+  } catch (error) {
+    console.error("Get Leads Error:", error);
+    res.status(500).json({ success: false, message: "Server error" });
   }
 };

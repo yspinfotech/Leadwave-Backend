@@ -7,7 +7,10 @@ const upload = require("../middleware/upload");
 
 const ROLES = require("../config/roles");
 
-const { createLeadFromForm } = require("../controllers/leadController");
+const {
+  createLeadFromForm,
+  getLeads,
+} = require("../controllers/leadController");
 
 const { importLeads } = require("../controllers/leadImportController");
 
@@ -18,6 +21,14 @@ const { importLeads } = require("../controllers/leadImportController");
  * POST /api/leads
  */
 router.post("/", auth, authorize(ROLES.ADMIN), createLeadFromForm);
+
+/**
+ * =========================
+ * GET LEADS (PAGINATED)
+ * =========================
+ * GET /api/leads?page=1
+ */
+router.get("/", auth, getLeads);
 
 /**
  * =========================
