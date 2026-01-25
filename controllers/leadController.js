@@ -14,10 +14,10 @@ exports.createLeadFromForm = async (req, res) => {
     /* =====================
        VALIDATION
     ===================== */
-    if (!firstName || !lastName || !phone) {
+    if (!firstName || !lastName || !phone || !email) {
       return res.status(400).json({
         success: false,
-        message: "First name, last name and phone are required",
+        message: "First name, last name, email and phone are required",
       });
     }
 
