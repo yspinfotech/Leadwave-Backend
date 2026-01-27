@@ -8,6 +8,11 @@ const {
   createAdmin,
   createSalesperson,
   getAdmins,
+  getUsers,
+  getUserById,
+  getSalesUsersForAssignment,
+  deleteUser,
+  updateUser,
 } = require("../controllers/userController");
 
 const ROLES = require("../config/roles");
