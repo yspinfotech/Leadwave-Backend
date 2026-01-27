@@ -1,0 +1,6 @@
+2026/01/27-12:37:13.806 4b60 Reusing MANIFEST E:\LeadWave\leadwavebackend\.wwebjs_auth\session\Default\Local Storage\leveldb/MANIFEST-000001
+2026/01/27-12:37:13.832 4b60 Recovering log #3
+2026/01/27-12:37:13.838 4b60 Reusing old log E:\LeadWave\leadwavebackend\.wwebjs_auth\session\Default\Local Storage\leveldb/000003.log 
+2026/01/27-12:38:13.852 31bc Level-0 table #5: started
+2026/01/27-12:38:13.886 31bc Level-0 table #5: 16443 bytes OK
+2026/01/27-12:38:13.889 31bc Delete type=0 #3

@@ -10,6 +10,7 @@ const ROLES = require("../config/roles");
 const {
   createLeadFromForm,
   getLeads,
+  assignLead,
 } = require("../controllers/leadController");
 
 const { importLeads } = require("../controllers/leadImportController");
@@ -29,6 +30,14 @@ router.post("/", auth, authorize(ROLES.ADMIN), createLeadFromForm);
  * GET /api/leads?page=1
  */
 router.get("/", auth, getLeads);
+
+/**
+ * =========================
+ * ADMIN – ASSIGN LEAD
+ * =========================
+ * PUT /api/leads/:id/assign
+ */
+router.put("/:id/assign", auth, authorize(ROLES.ADMIN), assignLead);
 
 /**
  * =========================

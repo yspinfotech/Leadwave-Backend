@@ -1,6 +1,8 @@
 const mongoose = require("mongoose");
 const Lead = require("../models/Lead");
 const { LEAD_SOURCE, LEAD_STATUS } = require("../config/leadEnums");
+const User = require("../models/User");
+const ROLES = require("../config/roles");
 
 /**
  * @route   POST /api/leads
@@ -76,6 +78,77 @@ exports.createLeadFromForm = async (req, res) => {
       success: false,
       message: "Server error",
     });
+  }
+};
+
+/**
+ * @route   PUT /api/leads/:id/assign
+ * @desc    Admin assigns a lead to a Salesperson
+ * @access  Admin only
+ */
+exports.assignLead = async (req, res) => {
+  try {
+    const leadId = req.params.id;
+    const { assignedTo } = req.body;
+
+    if (!assignedTo) {
+      return res
+        .status(400)
+        .json({ success: false, message: "assignedTo is required" });
+    }
+
+    // Verify assignee exists and is a Salesperson in the same company
+    const assignee = await User.findById(assignedTo);
+    if (!assignee) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Assignee not found" });
+    }
+
+    if (assignee.role !== ROLES.SALESPERSON) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Assignee must be a Salesperson" });
+    }
+
+    const adminCompanyId = req.user.companyId && req.user.companyId.toString();
+    const assigneeCompanyId =
+      assignee.companyId && assignee.companyId.toString();
+    if (adminCompanyId !== assigneeCompanyId) {
+      return res
+        .status(403)
+        .json({
+          success: false,
+          message: "Assignee does not belong to your company",
+        });
+    }
+
+    // Find lead in the same company
+    const lead = await Lead.findOne({
+      _id: leadId,
+      companyId: req.user.companyId,
+      isDeleted: false,
+    });
+    if (!lead) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Lead not found" });
+    }
+
+    lead.assigned_to = assignee._id;
+    lead.assigned_by = req.user._id;
+    await lead.save();
+
+    res
+      .status(200)
+      .json({
+        success: true,
+        message: "Lead assigned successfully",
+        data: lead,
+      });
+  } catch (error) {
+    console.error("Assign Lead Error:", error);
+    res.status(500).json({ success: false, message: "Server error" });
   }
 };
 
