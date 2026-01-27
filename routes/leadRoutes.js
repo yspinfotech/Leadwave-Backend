@@ -11,6 +11,8 @@ const {
   createLeadFromForm,
   getLeads,
   assignLead,
+  updateLead,
+  deleteLead,
 } = require("../controllers/leadController");
 
 const { importLeads } = require("../controllers/leadImportController");
@@ -38,6 +40,22 @@ router.get("/", auth, getLeads);
  * PUT /api/leads/:id/assign
  */
 router.put("/:id/assign", auth, authorize(ROLES.ADMIN), assignLead);
+
+/**
+ * =========================
+ * UPDATE LEAD
+ * =========================
+ * PUT /api/leads/:id
+ */
+router.put("/:id", auth, authorize(ROLES.ADMIN, ROLES.SALESPERSON), updateLead);
+
+/**
+ * =========================
+ * DELETE LEAD
+ * =========================
+ * DELETE /api/leads/:id
+ */
+router.delete("/:id", auth, authorize(ROLES.ADMIN), deleteLead);
 
 /**
  * =========================

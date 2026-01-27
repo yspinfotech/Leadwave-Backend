@@ -35,7 +35,7 @@ exports.createLeadFromForm = async (req, res) => {
     if (dupFilter.$or.length > 0) {
       existingLead = await Lead.findOneAndUpdate(
         dupFilter,
-        { $inc: { star: 1 } },
+        { $inc: { start: 1 } },
         { new: true },
       );
     }
@@ -78,6 +78,89 @@ exports.createLeadFromForm = async (req, res) => {
       success: false,
       message: "Server error",
     });
+  }
+};
+
+/**
+ * @route   PUT /api/leads/:id
+ * @desc    Update lead (Admin or assigned Salesperson)
+ * @access  Admin or Salesperson
+ */
+exports.updateLead = async (req, res) => {
+  try {
+    const leadId = req.params.id;
+    const allowed = [
+      "firstName",
+      "lastName",
+      "email",
+      "phone",
+      "alt_phone",
+      "leadStatus",
+      "expectedValue",
+      "next_followup_date",
+    ];
+
+    const lead = await Lead.findOne({
+      _id: leadId,
+      companyId: req.user.companyId,
+      isDeleted: false,
+    });
+    if (!lead)
+      return res
+        .status(404)
+        .json({ success: false, message: "Lead not found" });
+
+    // If salesperson, ensure they are assigned to this lead
+    if (req.user.role === ROLES.SALESPERSON) {
+      const userIdStr = req.user._id && req.user._id.toString();
+      const assignedToStr = lead.assigned_to && lead.assigned_to.toString();
+      if (!assignedToStr || assignedToStr !== userIdStr) {
+        return res
+          .status(403)
+          .json({ success: false, message: "Access denied" });
+      }
+    }
+
+    // Apply allowed updates
+    allowed.forEach((k) => {
+      if (req.body[k] !== undefined) lead[k] = req.body[k];
+    });
+
+    await lead.save();
+    res
+      .status(200)
+      .json({ success: true, message: "Lead updated", data: lead });
+  } catch (error) {
+    console.error("Update Lead Error:", error);
+    res.status(500).json({ success: false, message: "Server error" });
+  }
+};
+
+/**
+ * @route   DELETE /api/leads/:id
+ * @desc    Soft-delete a lead (Admin only)
+ * @access  Admin
+ */
+exports.deleteLead = async (req, res) => {
+  try {
+    const leadId = req.params.id;
+    const lead = await Lead.findOne({
+      _id: leadId,
+      companyId: req.user.companyId,
+      isDeleted: false,
+    });
+    if (!lead)
+      return res
+        .status(404)
+        .json({ success: false, message: "Lead not found" });
+
+    lead.isDeleted = true;
+    await lead.save();
+
+    res.status(200).json({ success: true, message: "Lead deleted" });
+  } catch (error) {
+    console.error("Delete Lead Error:", error);
+    res.status(500).json({ success: false, message: "Server error" });
   }
 };
 
