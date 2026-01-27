@@ -131,3 +131,221 @@ exports.getAdmins = async (req, res) => {
     res.status(500).json({ success: false, message: "Server error" });
   }
 };
+
+/**
+ * @route   GET /api/users
+ * @desc    Get users
+ * @access  Admin, SuperAdmin
+ */
+exports.getUsers = async (req, res) => {
+  try {
+    let query = {};
+
+    // Admin can only see users from their company
+    if (req.user.role === ROLES.ADMIN) {
+      query = {
+        companyId: req.user.companyId,
+        role: ROLES.SALESPERSON, // Only show salespersons, not other admins
+      };
+    }
+
+    // SuperAdmin can see all users except other superadmins
+    if (req.user.role === ROLES.SUPERADMIN) {
+      query.role = { $ne: ROLES.SUPERADMIN };
+    }
+
+    const users = await User.find(query)
+      .select("-password")
+      .populate("companyId", "name")
+      .sort({ createdTime: -1 });
+
+    res.status(200).json({
+      success: true,
+      count: users.length,
+      data: users,
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({
+      success: false,
+      message: "Server error",
+    });
+  }
+};
+
+/**
+ * @route   GET /api/users/:id
+ * @desc    Get user by ID
+ * @access  Admin, SuperAdmin
+ */
+exports.getUserById = async (req, res) => {
+  try {
+    const user = await User.findById(req.params.id).select("-password");
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found",
+      });
+    }
+
+    // Check permissions
+    if (
+      req.user.role === ROLES.ADMIN &&
+      user.companyId.toString() !== req.user.companyId.toString()
+    ) {
+      return res.status(403).json({
+        success: false,
+        message: "Access denied",
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      data: user,
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({
+      success: false,
+      message: "Server error",
+    });
+  }
+};
+
+/**
+ * @route   PUT /api/users/:id
+ * @desc    Update user
+ * @access  Admin, SuperAdmin
+ */
+exports.updateUser = async (req, res) => {
+  try {
+    const { name, email, mobile, city, isActive } = req.body;
+
+    // Find user
+    const user = await User.findById(req.params.id);
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found",
+      });
+    }
+
+    // Check permissions
+    if (
+      req.user.role === ROLES.ADMIN &&
+      user.companyId.toString() !== req.user.companyId.toString()
+    ) {
+      return res.status(403).json({
+        success: false,
+        message: "Access denied",
+      });
+    }
+
+    // Update fields
+    if (name) user.name = name;
+    if (email) user.email = email;
+    if (mobile) user.mobile = mobile;
+    if (city) user.city = city;
+    if (isActive !== undefined) user.isActive = isActive;
+
+    await user.save();
+
+    const updatedUser = await User.findById(user._id).select("-password");
+
+    res.status(200).json({
+      success: true,
+      message: "User updated successfully",
+      data: updatedUser,
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({
+      success: false,
+      message: "Server error",
+    });
+  }
+};
+
+/**
+ * @route   DELETE /api/users/:id
+ * @desc    Delete user (soft delete)
+ * @access  Admin, SuperAdmin
+ */
+exports.deleteUser = async (req, res) => {
+  try {
+    const user = await User.findById(req.params.id);
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found",
+      });
+    }
+
+    // Check permissions
+    if (
+      req.user.role === ROLES.ADMIN &&
+      user.companyId.toString() !== req.user.companyId.toString()
+    ) {
+      return res.status(403).json({
+        success: false,
+        message: "Access denied",
+      });
+    }
+
+    // Don't allow deleting superadmin
+    if (user.role === ROLES.SUPERADMIN) {
+      return res.status(403).json({
+        success: false,
+        message: "Cannot delete superadmin",
+      });
+    }
+
+    // Soft delete - set isActive to false
+    user.isActive = false;
+    await user.save();
+
+    res.status(200).json({
+      success: true,
+      message: "User deleted successfully",
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({
+      success: false,
+      message: "Server error",
+    });
+  }
+};
+
+/**
+ * @route   GET /api/users/for-assignment
+ * @desc    Get sales users for lead assignment
+ * @access  Admin
+ */
+exports.getSalesUsersForAssignment = async (req, res) => {
+  try {
+    const users = await User.find({
+      companyId: req.user.companyId,
+      role: ROLES.SALESPERSON,
+      isActive: true,
+    })
+      .select("name email mobile city")
+      .sort({ name: 1 });
+
+    console.log("Found users:", users.length);
+
+    res.status(200).json({
+      success: true,
+      data: users,
+    });
+  } catch (error) {
+    console.error("Error in getSalesUsersForAssignment:", error);
+    res.status(500).json({
+      success: false,
+      message: "Server error",
+    });
+  }
+};

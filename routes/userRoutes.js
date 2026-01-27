@@ -1,3 +1,4 @@
+// routes/userRoutes.js - FIXED VERSION
 const express = require("express");
 const router = express.Router();
 
@@ -30,5 +31,54 @@ router.get("/admins", auth, authorize(ROLES.SUPERADMIN), getAdmins);
  * @access  Admin
  */
 router.post("/salesperson", auth, authorize(ROLES.ADMIN), createSalesperson);
+
+/**
+ * @route   GET /api/users
+ * @desc    Get users (Admin gets company users, SuperAdmin gets all)
+ * @access  Admin, SuperAdmin
+ */
+// FIX: Use spread operator
+router.get("/", auth, authorize(ROLES.ADMIN, ROLES.SUPERADMIN), getUsers);
+
+/**
+ * @route   GET /api/users/:id
+ * @desc    Get user by ID
+ * @access  Admin, SuperAdmin
+ */
+// FIX: Use spread operator
+router.get("/:id", auth, authorize(ROLES.ADMIN, ROLES.SUPERADMIN), getUserById);
+
+/**
+ * @route   PUT /api/users/:id
+ * @desc    Update user
+ * @access  Admin, SuperAdmin
+ */
+// FIX: Use spread operator
+router.put("/:id", auth, authorize(ROLES.ADMIN, ROLES.SUPERADMIN), updateUser);
+
+/**
+ * @route   DELETE /api/users/:id
+ * @desc    Delete user (soft delete)
+ * @access  Admin, SuperAdmin
+ */
+// FIX: Use spread operator
+router.delete(
+  "/:id",
+  auth,
+  authorize(ROLES.ADMIN, ROLES.SUPERADMIN),
+  deleteUser,
+);
+
+/**
+ * @route   GET /api/users/for-assignment
+ * @desc    Get sales users for lead assignment
+ * @access  Admin
+ */
+router.get(
+  "/for-assignment",
+  auth,
+  authorize(ROLES.ADMIN),
+  getSalesUsersForAssignment,
+);
 
 module.exports = router;
