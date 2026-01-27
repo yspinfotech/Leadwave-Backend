@@ -50,10 +50,12 @@ exports.importLeads = async (req, res) => {
        PROCESS LEADS
     ===================== */
     let inserted = 0;
+    let updated = 0; // existing leads had `start` incremented
     let skipped = 0;
     let errors = [];
 
     for (const row of leads) {
+      console.log(row);
       const firstName = row.firstName || row.firstname;
       const lastName = row.lastName || row.lastname;
       const phone = row.phone;
@@ -70,15 +72,29 @@ exports.importLeads = async (req, res) => {
         continue;
       }
 
-      // Duplicate check (company + phone)
-      const exists = await Lead.findOne({
+      // Duplicate check (company + phone OR email)
+      const filter = {
         companyId: req.user.companyId,
-        phone,
         isDeleted: false,
-      });
+        $or: [],
+      };
+
+      if (phone) filter.$or.push({ phone });
+      if (email) filter.$or.push({ email });
+
+      let exists = null;
+      if (filter.$or.length > 0) {
+        // Atomically increment `start` when a matching lead exists
+        exists = await Lead.findOneAndUpdate(
+          filter,
+          { $inc: { star: 1 } },
+          { new: true },
+        );
+      }
 
       if (exists) {
-        skipped++;
+        // Mark as updated (we incremented `start` above), do not insert duplicate
+        updated++;
         continue;
       }
 
@@ -106,6 +122,7 @@ exports.importLeads = async (req, res) => {
       summary: {
         total: leads.length,
         inserted,
+        updated,
         skipped,
         errorsCount: errors.length,
       },

@@ -119,6 +119,14 @@ const LeadSchema = new mongoose.Schema(
     },
 
     /* =====================
+       IMPORT METRICS
+    ===================== */
+    star: {
+      type: Number,
+      default: 1,
+    },
+
+    /* =====================
        SYSTEM FIELDS
     ===================== */
     isDeleted: {

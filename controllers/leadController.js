@@ -21,20 +21,28 @@ exports.createLeadFromForm = async (req, res) => {
       });
     }
 
-    /* =====================
-       DUPLICATE CHECK
-       (same company + phone)
-    ===================== */
-    const existingLead = await Lead.findOne({
+    const dupFilter = {
       companyId: req.user.companyId,
-      phone,
       isDeleted: false,
-    });
+      $or: [],
+    };
+    if (phone) dupFilter.$or.push({ phone });
+    if (email) dupFilter.$or.push({ email });
+
+    let existingLead = null;
+    if (dupFilter.$or.length > 0) {
+      existingLead = await Lead.findOneAndUpdate(
+        dupFilter,
+        { $inc: { star: 1 } },
+        { new: true },
+      );
+    }
 
     if (existingLead) {
-      return res.status(409).json({
-        success: false,
-        message: "Lead with this phone already exists",
+      return res.status(200).json({
+        success: true,
+        message: "Existing lead found; incremented start counter",
+        data: existingLead,
       });
     }
 
