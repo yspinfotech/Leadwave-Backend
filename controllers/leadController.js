@@ -89,16 +89,16 @@ exports.createLeadFromForm = async (req, res) => {
 exports.assignLead = async (req, res) => {
   try {
     const leadId = req.params.id;
-    const { assignedTo } = req.body;
+    const { userId } = req.body;
 
-    if (!assignedTo) {
+    if (!userId) {
       return res
         .status(400)
         .json({ success: false, message: "assignedTo is required" });
     }
 
     // Verify assignee exists and is a Salesperson in the same company
-    const assignee = await User.findById(assignedTo);
+    const assignee = await User.findById(userId);
     if (!assignee) {
       return res
         .status(404)
@@ -115,12 +115,10 @@ exports.assignLead = async (req, res) => {
     const assigneeCompanyId =
       assignee.companyId && assignee.companyId.toString();
     if (adminCompanyId !== assigneeCompanyId) {
-      return res
-        .status(403)
-        .json({
-          success: false,
-          message: "Assignee does not belong to your company",
-        });
+      return res.status(403).json({
+        success: false,
+        message: "Assignee does not belong to your company",
+      });
     }
 
     // Find lead in the same company
@@ -139,13 +137,11 @@ exports.assignLead = async (req, res) => {
     lead.assigned_by = req.user._id;
     await lead.save();
 
-    res
-      .status(200)
-      .json({
-        success: true,
-        message: "Lead assigned successfully",
-        data: lead,
-      });
+    res.status(200).json({
+      success: true,
+      message: "Lead assigned successfully",
+      data: lead,
+    });
   } catch (error) {
     console.error("Assign Lead Error:", error);
     res.status(500).json({ success: false, message: "Server error" });
