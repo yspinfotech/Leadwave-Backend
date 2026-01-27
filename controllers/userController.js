@@ -96,3 +96,38 @@ exports.createSalesperson = async (req, res) => {
     });
   }
 };
+
+/**
+ * @route   GET /api/users/admins
+ * @desc    Get paginated list of Admin users
+ * @access  SuperAdmin only
+ */
+exports.getAdmins = async (req, res) => {
+  try {
+    let { page = 1, limit = 10 } = req.query;
+    page = parseInt(page, 10);
+    limit = parseInt(limit, 10);
+
+    if (isNaN(page) || page < 1) page = 1;
+    if (isNaN(limit) || limit < 1) limit = 10;
+
+    const filter = { role: ROLES.ADMIN };
+    const total = await User.countDocuments(filter);
+    const pages = Math.ceil(total / limit);
+
+    const admins = await User.find(filter)
+      .select("-password")
+      .skip((page - 1) * limit)
+      .limit(limit)
+      .lean();
+
+    res.status(200).json({
+      success: true,
+      data: admins,
+      pagination: { total, page, pages, limit },
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ success: false, message: "Server error" });
+  }
+};

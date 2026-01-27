@@ -74,3 +74,36 @@ exports.createCompany = async (req, res) => {
     });
   }
 };
+
+/**
+ * @route   GET /api/companies
+ * @desc    Get paginated list of companies
+ * @access  SuperAdmin only
+ */
+exports.getCompanies = async (req, res) => {
+  try {
+    let { page = 1, limit = 10 } = req.query;
+    page = parseInt(page, 10);
+    limit = parseInt(limit, 10);
+
+    if (isNaN(page) || page < 1) page = 1;
+    if (isNaN(limit) || limit < 1) limit = 10;
+
+    const total = await Company.countDocuments();
+    const pages = Math.ceil(total / limit);
+
+    const companies = await Company.find()
+      .skip((page - 1) * limit)
+      .limit(limit)
+      .lean();
+
+    res.status(200).json({
+      success: true,
+      data: companies,
+      pagination: { total, page, pages, limit },
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ success: false, message: "Server error" });
+  }
+};

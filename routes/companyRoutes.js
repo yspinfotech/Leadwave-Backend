@@ -3,7 +3,10 @@ const router = express.Router();
 
 const auth = require("../middleware/auth");
 const authorize = require("../middleware/authorize");
-const { createCompany } = require("../controllers/companyController");
+const {
+  createCompany,
+  getCompanies,
+} = require("../controllers/companyController");
 const ROLES = require("../config/roles");
 
 /**
@@ -13,5 +16,11 @@ const ROLES = require("../config/roles");
  */
 
 router.post("/", auth, authorize(ROLES.SUPERADMIN), createCompany);
+
+/**
+ * @route   GET /api/companies
+ * @desc    Get paginated list of companies (SuperAdmin only)
+ */
+router.get("/", auth, authorize(ROLES.SUPERADMIN), getCompanies);
 
 module.exports = router;

@@ -6,6 +6,7 @@ const authorize = require("../middleware/authorize");
 const {
   createAdmin,
   createSalesperson,
+  getAdmins,
 } = require("../controllers/userController");
 
 const ROLES = require("../config/roles");
@@ -16,6 +17,12 @@ const ROLES = require("../config/roles");
  * @access  SuperAdmin
  */
 router.post("/admin", auth, authorize(ROLES.SUPERADMIN), createAdmin);
+
+/**
+ * @route   GET /api/users/admins
+ * @desc    Get paginated list of Admin users (SuperAdmin only)
+ */
+router.get("/admins", auth, authorize(ROLES.SUPERADMIN), getAdmins);
 
 /**
  * @route   POST /api/users/salesperson
