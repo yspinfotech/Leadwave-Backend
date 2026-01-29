@@ -10,6 +10,7 @@ const ROLES = require("../config/roles");
 const {
   createLeadFromForm,
   getLeads,
+  getAssignedLeads,
   assignLead,
   updateLead,
   deleteLead,
@@ -32,6 +33,14 @@ router.post("/", auth, authorize(ROLES.ADMIN), createLeadFromForm);
  * GET /api/leads?page=1
  */
 router.get("/", auth, getLeads);
+
+/**
+ * =========================
+ * GET LEADS ASSIGNED TO USER (PAGINATED)
+ * =========================
+ * GET /api/leads/assigned?page=1&limit=10
+ */
+router.get("/assigned", auth, getAssignedLeads);
 
 /**
  * =========================

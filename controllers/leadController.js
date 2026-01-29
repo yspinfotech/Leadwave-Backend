@@ -294,3 +294,56 @@ exports.getLeads = async (req, res) => {
     res.status(500).json({ success: false, message: "Server error" });
   }
 };
+
+/**
+ * @route   GET /api/leads/assigned
+ * @desc    Get leads assigned to the authenticated user (paginated)
+ * @access  Authenticated users
+ */
+exports.getAssignedLeads = async (req, res) => {
+  try {
+    const page = parseInt(req.query.page, 10) || 1;
+    const limit = parseInt(req.query.limit, 10) || 10;
+    const skip = (page - 1) * limit;
+
+    const userIdRaw = req.user && req.user._id;
+    const companyIdRaw = req.user && req.user.companyId;
+
+    // Cast IDs when possible for reliable matching
+    let userId;
+    try {
+      userId = mongoose.Types.ObjectId(userIdRaw);
+    } catch (e) {
+      userId = userIdRaw;
+    }
+
+    let companyId;
+    try {
+      companyId = mongoose.Types.ObjectId(companyIdRaw);
+    } catch (e) {
+      companyId = companyIdRaw;
+    }
+
+    const filter = {
+      isDeleted: false,
+      assigned_to: userId,
+      $or: [{ companyId }, { companyId: companyId && companyId.toString() }],
+    };
+
+    const [total, leads] = await Promise.all([
+      Lead.countDocuments(filter),
+      Lead.find(filter).sort({ created: -1 }).skip(skip).limit(limit),
+    ]);
+
+    const totalPages = Math.ceil(total / limit) || 1;
+
+    res.status(200).json({
+      success: true,
+      data: leads,
+      meta: { page, limit, total, totalPages },
+    });
+  } catch (error) {
+    console.error("Get Assigned Leads Error:", error);
+    res.status(500).json({ success: false, message: "Server error" });
+  }
+};
