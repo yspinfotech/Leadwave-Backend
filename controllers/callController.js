@@ -160,6 +160,8 @@ exports.getCallsBySalesperson = async (req, res) => {
     const [total, calls] = await Promise.all([
       CallLog.countDocuments(filter),
       CallLog.find(filter)
+        .populate("userId", "name email mobile role")
+        .populate("leadId", "firstName lastName phone email assigned_to")
         .sort({ callTime: -1 })
         .skip(skip)
         .limit(parseInt(limit, 10)),
@@ -201,6 +203,8 @@ exports.getCalls = async (req, res) => {
     const [total, calls] = await Promise.all([
       CallLog.countDocuments(filter),
       CallLog.find(filter)
+        .populate("userId", "name email mobile role")
+        .populate("leadId", "firstName lastName phone email assigned_to")
         .sort({ callTime: -1 })
         .skip(skip)
         .limit(parseInt(limit, 10)),
