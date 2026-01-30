@@ -89,6 +89,12 @@ exports.createLeadFromForm = async (req, res) => {
 exports.updateLead = async (req, res) => {
   try {
     const leadId = req.params.id;
+    // validate leadId to avoid CastError when an invalid id is passed
+    if (!mongoose.Types.ObjectId.isValid(leadId)) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Invalid lead id" });
+    }
     const allowed = [
       "firstName",
       "lastName",
@@ -227,6 +233,86 @@ exports.assignLead = async (req, res) => {
     });
   } catch (error) {
     console.error("Assign Lead Error:", error);
+    res.status(500).json({ success: false, message: "Server error" });
+  }
+};
+
+/**
+ * @route   PUT /api/leads/update-by-salesperson
+ * @desc    Salesperson updates their assigned lead (limited fields)
+ * @access  Salesperson only
+ */
+exports.updateLeadBySalesperson = async (req, res) => {
+  try {
+    const {
+      leadId,
+      status,
+      followupdate,
+      note_desc,
+      expectedValue,
+      contacted,
+    } = req.body;
+
+    if (!leadId) {
+      return res
+        .status(400)
+        .json({ success: false, message: "leadId is required" });
+    }
+
+    // find lead in same company
+    const lead = await Lead.findOne({
+      _id: leadId,
+      companyId: req.user.companyId,
+      isDeleted: false,
+    });
+    if (!lead)
+      return res
+        .status(404)
+        .json({ success: false, message: "Lead not found" });
+
+    // ensure user is the assigned salesperson
+    const userIdStr = req.user._id && req.user._id.toString();
+    const assignedToStr = lead.assigned_to && lead.assigned_to.toString();
+    if (!assignedToStr || assignedToStr !== userIdStr) {
+      return res.status(403).json({ success: false, message: "Access denied" });
+    }
+
+    // Update status if provided
+    if (status !== undefined) lead.leadStatus = status;
+
+    // Update next followup date if provided
+    if (
+      followupdate !== undefined &&
+      followupdate !== null &&
+      followupdate !== ""
+    ) {
+      lead.next_followup_date = new Date(followupdate);
+    }
+
+    // Add note if provided
+    if (note_desc) {
+      lead.notes = lead.notes || [];
+      lead.notes.push({ note_desc, addedBy: req.user._id });
+    }
+
+    // assigned_by should be the userid from token
+    lead.assigned_by = req.user._id;
+
+    // expected value
+    if (expectedValue !== undefined) lead.expectedValue = expectedValue;
+
+    // last contacted date should be today's date only if contacted flag true
+    if (contacted === true || contacted === "true") {
+      lead.last_contacted_date = new Date();
+    }
+
+    await lead.save();
+
+    res
+      .status(200)
+      .json({ success: true, message: "Lead updated", data: lead });
+  } catch (error) {
+    console.error("Update Lead By Salesperson Error:", error);
     res.status(500).json({ success: false, message: "Server error" });
   }
 };

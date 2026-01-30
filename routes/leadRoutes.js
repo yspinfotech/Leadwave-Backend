@@ -13,6 +13,7 @@ const {
   getAssignedLeads,
   assignLead,
   updateLead,
+  updateLeadBySalesperson,
   deleteLead,
 } = require("../controllers/leadController");
 
@@ -56,7 +57,40 @@ router.put("/:id/assign", auth, authorize(ROLES.ADMIN), assignLead);
  * =========================
  * PUT /api/leads/:id
  */
+
+/**
+ * =========================
+ * SALESPERSON - UPDATE OWN ASSIGNED LEAD
+ * =========================
+ * PUT /api/leads/update-by-salesperson
+ */
+router.put(
+  "/update-by-salesperson",
+  auth,
+  authorize(ROLES.SALESPERSON),
+  updateLeadBySalesperson,
+);
+
+/**
+ * =========================
+ * UPDATE LEAD
+ * =========================
+ * PUT /api/leads/:id
+ */
 router.put("/:id", auth, authorize(ROLES.ADMIN, ROLES.SALESPERSON), updateLead);
+
+/**
+ * =========================
+ * SALESPERSON - UPDATE OWN ASSIGNED LEAD
+ * =========================
+ * PUT /api/leads/update-by-salesperson
+ */
+router.put(
+  "/update-by-salesperson",
+  auth,
+  authorize(ROLES.SALESPERSON),
+  updateLeadBySalesperson,
+);
 
 /**
  * =========================

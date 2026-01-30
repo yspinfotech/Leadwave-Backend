@@ -1,0 +1,51 @@
+{
+  "company": {
+    "name": "Demo Company",
+    "_id": "60d5f9b5f1a2c2a3b0e1d111"
+  },
+  "users": [
+    {
+      "role": "ADMIN",
+      "email": "admin@demo.com",
+      "password": "Admin123!",
+      "firstName": "Admin",
+      "lastName": "Demo",
+      "companyId": "60d5f9b5f1a2c2a3b0e1d111",
+      "_id": "60d5f9b5f1a2c2a3b0e1d112"
+    },
+    {
+      "role": "SALESPERSON",
+      "email": "sales@demo.com",
+      "password": "Sales123!",
+      "firstName": "Sales",
+      "lastName": "User",
+      "companyId": "60d5f9b5f1a2c2a3b0e1d111",
+      "_id": "60d5f9b5f1a2c2a3b0e1d113"
+    }
+  ],
+  "leads": [
+    {
+      "firstName": "Demo",
+      "lastName": "Lead",
+      "email": "demo.lead@example.com",
+      "phone": "+1234567890",
+      "companyId": "60d5f9b5f1a2c2a3b0e1d111",
+      "assigned_to": "60d5f9b5f1a2c2a3b0e1d113",
+      "assigned_by": "60d5f9b5f1a2c2a3b0e1d112",
+      "_id": "60d5f9b5f1a2c2a3b0e1d114"
+    }
+  ],
+  "callLogs": [
+    {
+      "leadId": "60d5f9b5f1a2c2a3b0e1d114",
+      "userId": "60d5f9b5f1a2c2a3b0e1d113",
+      "companyId": "60d5f9b5f1a2c2a3b0e1d111",
+      "callTime": "2026-01-29T10:30:00.000Z",
+      "durationSeconds": 180,
+      "callStatus": "connected",
+      "callType": "outgoing",
+      "recordingLink": "https://storage.example.com/recordings/rec1.mp3",
+      "notes": "Discussed pricing and next steps"
+    }
+  ]
+}
