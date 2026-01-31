@@ -11,7 +11,17 @@ const ROLES = require("../config/roles");
  */
 exports.createLeadFromForm = async (req, res) => {
   try {
-    const { firstName, lastName, email, phone, alt_phone } = req.body;
+    const {
+      firstName,
+      lastName,
+      email,
+      phone,
+      alt_phone,
+      tag,
+      activity,
+      platform,
+      leadSource,
+    } = req.body;
 
     /* =====================
        VALIDATION
@@ -57,8 +67,10 @@ exports.createLeadFromForm = async (req, res) => {
       email,
       phone,
       alt_phone,
-
-      leadSource: LEAD_SOURCE.WEBSITE, // default for form
+      tag,
+      activity,
+      platform,
+      leadSource,
       leadStatus: LEAD_STATUS.NEW,
 
       companyId: req.user.companyId,

@@ -1,6 +1,9 @@
 const express = require("express");
 const router = express.Router();
 
+const multer = require("multer");
+const upload = multer({ dest: "uploads/" });
+
 const auth = require("../middleware/auth");
 const authorize = require("../middleware/authorize");
 const ROLES = require("../config/roles");
@@ -12,7 +15,13 @@ const {
 } = require("../controllers/callController");
 
 // Salesperson creates a call record
-router.post("/", auth, authorize(ROLES.SALESPERSON), createCall);
+router.post(
+  "/",
+  auth,
+  authorize(ROLES.SALESPERSON),
+  upload.single("recording"),
+  createCall,
+);
 
 // Get calls for a lead (salesperson or admin)
 router.get("/lead/:leadId", auth, getCallsByLead);

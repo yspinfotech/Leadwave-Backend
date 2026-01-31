@@ -61,6 +61,9 @@ exports.importLeads = async (req, res) => {
       const phone = row.phone;
       const email = row.email || null;
       const alt_phone = row.alt_phone || null;
+      const tag = row.tag;
+      const activity = row.activity;
+      const platform = row.platform;
 
       // Required validation
       if (!firstName || !lastName || !phone) {
@@ -104,8 +107,11 @@ exports.importLeads = async (req, res) => {
         email,
         phone,
         alt_phone,
+        tag,
+        activity,
+        platform,
 
-        leadSource: LEAD_SOURCE.FILE,
+        leadSource,
         leadStatus: LEAD_STATUS.NEW,
 
         companyId: req.user.companyId,

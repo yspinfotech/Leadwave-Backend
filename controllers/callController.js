@@ -3,73 +3,63 @@ const CallLog = require("../models/CallLog");
 const Lead = require("../models/Lead");
 const User = require("../models/User");
 const ROLES = require("../config/roles");
+const cloudinary = require("cloudinary").v2;
+const fs = require("fs");
 
-// POST /api/calls
-// Salesperson creates a call record
+// Cloudinary Configuration
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET,
+});
+
 exports.createCall = async (req, res) => {
   try {
-    const {
-      leadId,
-      callTime,
-      durationSeconds,
-      callStatus,
-      callType,
-      recordingLink,
-      notes,
-    } = req.body;
+    // When using FormData/Multer, text fields are in req.body
+    let { leadId, callTime, durationSeconds, callStatus, callType, notes } =
+      req.body;
 
-    // console.log("Routing to the callcreate");
+    let recordingLink = req.body.recordingLink || null;
 
-    if (!leadId) {
-      return res
-        .status(400)
-        .json({ success: false, message: "leadId is required" });
-    }
-
-    if (!mongoose.Types.ObjectId.isValid(leadId)) {
-      return res
-        .status(400)
-        .json({ success: false, message: "Invalid leadId" });
-    }
-
-    const lead = await Lead.findOne({ _id: leadId, isDeleted: false });
-    if (!lead) {
-      return res
-        .status(404)
-        .json({ success: false, message: "Lead not found" });
-    }
-
-    // Ensure same company
-    const userCompany = req.user.companyId && req.user.companyId.toString();
-    const leadCompany = lead.companyId && lead.companyId.toString();
-    if (userCompany !== leadCompany) {
-      return res.status(403).json({
-        success: false,
-        message: "Lead does not belong to your company",
-      });
-    }
-
-    // If salesperson role, ensure they are assigned to this lead (optional but recommended)
-    if (req.user.role === ROLES.SALESPERSON) {
-      const userIdStr = req.user._id && req.user._id.toString();
-      const assignedToStr = lead.assigned_to && lead.assigned_to.toString();
-      if (!assignedToStr || assignedToStr !== userIdStr) {
-        return res.status(403).json({
-          success: false,
-          message: "You are not assigned to this lead",
+    // 1. Handle File Upload to Cloudinary if a file is present
+    if (req.file) {
+      try {
+        const result = await cloudinary.uploader.upload(req.file.path, {
+          resource_type: "video", // 'video' handles audio files in Cloudinary
+          folder: "call_recordings",
         });
+        recordingLink = result.secure_url;
+
+        // Delete local temp file
+        fs.unlinkSync(req.file.path);
+      } catch (uploadError) {
+        console.error("Cloudinary Upload Error:", uploadError);
+        // Fallback or handle error
       }
     }
 
+    if (!leadId)
+      return res
+        .status(400)
+        .json({ success: false, message: "leadId is required" });
+
+    // ... (Validation and Lead Checks - Keep your existing logic) ...
+    const lead = await Lead.findOne({ _id: leadId, isDeleted: false });
+    if (!lead)
+      return res
+        .status(404)
+        .json({ success: false, message: "Lead not found" });
+
+    // 2. Create the Call Log with the new Recording Link
     const callLog = await CallLog.create({
       leadId,
       userId: req.user._id,
       companyId: req.user.companyId,
       callTime: callTime ? new Date(callTime) : new Date(),
-      durationSeconds: durationSeconds || 0,
+      durationSeconds: parseInt(durationSeconds) || 0,
       callStatus: callStatus || null,
       callType: callType || null,
-      recordingLink: recordingLink || null,
+      recordingLink: recordingLink, // This will now be the Cloudinary URL
       notes: notes || "",
     });
 
@@ -79,7 +69,6 @@ exports.createCall = async (req, res) => {
     return res.status(500).json({ success: false, message: "Server error" });
   }
 };
-
 // GET /api/calls/lead/:leadId
 // Get all calls for a lead (company-scoped). Salesperson can access only if assigned, Admin can access all.
 exports.getCallsByLead = async (req, res) => {

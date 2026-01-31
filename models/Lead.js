@@ -60,14 +60,24 @@ const LeadSchema = new mongoose.Schema(
     ===================== */
     leadSource: {
       type: String,
-      enum: Object.values(LEAD_SOURCE),
-      default: LEAD_SOURCE.FILE, // default for import
+      required: true,
+      default: "file", // default for import
     },
-
+    tag: {
+      type: String,
+      required: true,
+    },
+    platform: {
+      type: String,
+      required: true,
+    },
+    activity: {
+      type: String,
+      required: true,
+    },
     leadStatus: {
       type: String,
-      enum: Object.values(LEAD_STATUS),
-      default: LEAD_STATUS.NEW,
+      default: "new",
     },
 
     /* =====================
