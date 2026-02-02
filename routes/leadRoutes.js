@@ -13,6 +13,7 @@ const {
   getAssignedLeads,
   assignLead,
   updateLead,
+  getSingleLead,
   updateLeadBySalesperson,
   deleteLead,
 } = require("../controllers/leadController");
@@ -34,6 +35,8 @@ router.post("/", auth, authorize(ROLES.ADMIN), createLeadFromForm);
  * GET /api/leads?page=1
  */
 router.get("/", auth, getLeads);
+
+router.get("/:id", auth, getSingleLead);
 
 /**
  * =========================
