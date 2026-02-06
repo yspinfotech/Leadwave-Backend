@@ -36,7 +36,7 @@ router.post("/", auth, authorize(ROLES.ADMIN), createLeadFromForm);
  */
 router.get("/", auth, getLeads);
 
-router.get("/:id", auth, getSingleLead);
+router.get("/single/:id", auth, getSingleLead);
 
 /**
  * =========================
