@@ -3,7 +3,8 @@ const passport = require("passport");
 const dotenv = require("dotenv");
 const helmet = require("helmet");
 const cors = require("cors");
-const path=require("path");
+const path=require('path');
+
 const connectDB = require("./config/db");
 
 // Load environment variables
@@ -19,28 +20,8 @@ const app = express();
 ========================= */
 app.use(express.json());
 app.use(helmet());
+app.use(cors());
 
-
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
-app.use(
-  cors({
-    origin: [ 'http://localhost:5173',
-              'http://ec2-13-232-135-239.ap-south-1.compute.amazonaws.com',
-            //   'https://ec2-13-232-135-239.ap-south-1.compute.amazonaws.com'
-            ],
-    credentials: true
-  })
-);
-
-
-// Angular build file added here and  setup ther=ir routing here.
-app.use(express.static(path.join(__dirname, 'public')));
-app.get('/', (req, res) => {
-  console.log(">>>> ",express.static(path.join(__dirname, 'public')))
-  console.log("TEST baseURL 1",req.baseUrl);
-  res.sendFile(path.join(__dirname, 'public', 'index.html'));
-})
 /* =========================
    Passport Initialization
 ========================= */
