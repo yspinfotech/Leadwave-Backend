@@ -19,7 +19,33 @@ const app = express();
    Global Middlewares
 ========================= */
 app.use(express.json());
-app.use(helmet());
+
+// Add custom headers BEFORE helmet to override
+app.use((req, res, next) => {
+  // Allow all origins for development
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  
+  // Prevent mixed content blocking - ALLOW HTTP
+  res.setHeader('Content-Security-Policy', "default-src 'self' http:; style-src 'self' 'unsafe-inline';");
+  
+  // Remove problematic headers that force HTTPS
+  res.removeHeader('Strict-Transport-Security');
+  res.removeHeader('Cross-Origin-Opener-Policy');
+  res.removeHeader('Cross-Origin-Embedder-Policy');
+  
+  next();
+});
+
+// Then use helmet (it adds security headers)
+app.use(helmet({
+  // Disable HSTS header that forces HTTPS
+  hsts: false,
+  // Disable contentSecurityPolicy as we set our own
+  contentSecurityPolicy: false,
+  crossOriginOpenerPolicy: false,
+  crossOriginEmbedderPolicy: false
+}));
+
 app.use(cors());
 
 /* =========================
@@ -27,6 +53,15 @@ app.use(cors());
 ========================= */
 app.use(passport.initialize());
 require("./config/passport")(passport);
+
+/* =========================
+   Serve Static Assets
+========================= */
+// Serve React build files
+app.use(express.static(path.join(__dirname, "build")));
+
+// Serve assets directory separately
+app.use('/assets', express.static(path.join(__dirname, "build", "assets")));
 
 /* =========================
    API Routes
@@ -48,11 +83,6 @@ app.get("/api/health", (req, res) => {
 });
 
 const PORT = process.env.PORT || 5000;
-
-/* =========================
-   Serve React Build (Static Files)
-========================= */
-app.use(express.static(path.join(__dirname, "build")));
 
 /* =========================
    Catch-all for React SPA - SIMPLEST SOLUTION
