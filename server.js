@@ -4,7 +4,7 @@ const dotenv = require("dotenv");
 const helmet = require("helmet");
 const cors = require("cors");
 const path = require('path');
-
+// const { mongoose } = require("./models");
 const connectDB = require("./config/db");
 
 // Load environment variables
@@ -71,7 +71,7 @@ app.use("/api/companies", require("./routes/companyRoutes"));
 app.use("/api/users", require("./routes/userRoutes"));
 app.use("/api/leads", require("./routes/leadRoutes"));
 app.use("/api/calls", require("./routes/callRoutes"));
-
+app.use("/api/campaigns", require('./routes/campaignRoutes'));
 /* =========================
    Health Check
 ========================= */

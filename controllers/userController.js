@@ -32,7 +32,7 @@ exports.createAdmin = async (req, res) => {
       password,
       mobile,
       city,
-      role: ROLES.ADMIN,
+      role: ROLES.MANAGER,
     });
 
     res.status(201).json({
@@ -80,7 +80,7 @@ exports.createSalesperson = async (req, res) => {
       password,
       mobile,
       city,
-      role: ROLES.SALESPERSON,
+      role: ROLES.MANAGER,
     });
 
     res.status(201).json({
@@ -145,7 +145,7 @@ exports.getUsers = async (req, res) => {
     if (req.user.role === ROLES.ADMIN) {
       query = {
         companyId: req.user.companyId,
-        role: ROLES.SALESPERSON, // Only show salespersons, not other admins
+        role: { $in: [ROLES.SALESPERSON, ROLES.MANAGER] } // Show both salespersons and managers
       };
     }
 
