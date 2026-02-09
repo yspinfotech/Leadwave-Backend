@@ -42,7 +42,7 @@ exports.createLeadFromForm = async (req, res) => {
         _id: campaign,
         companyId: req.user.companyId,
       });
-      
+
       if (!campaignExists) {
         return res.status(400).json({
           success: false,
@@ -64,7 +64,7 @@ exports.createLeadFromForm = async (req, res) => {
       // Update star for duplicate
       existingLead.star += 1;
       await existingLead.save();
-      
+
       return res.status(200).json({
         success: true,
         message: "Existing lead found; star incremented",
@@ -92,21 +92,22 @@ exports.createLeadFromForm = async (req, res) => {
 
     // Add note if provided
     if (notes) {
-      leadData.notes = [{
-        note_desc: notes,
-        addedBy: req.user._id,
-        createdTime: new Date(),
-      }];
+      leadData.notes = [
+        {
+          note_desc: notes,
+          addedBy: req.user._id,
+          createdTime: new Date(),
+        },
+      ];
     }
 
     const lead = await Lead.create(leadData);
 
     // Update campaign stats if campaign is assigned
     if (campaign) {
-      await mongoose.model("Campaign").findByIdAndUpdate(
-        campaign,
-        { $inc: { 'stats.totalLeads': 1 } }
-      );
+      await mongoose
+        .model("Campaign")
+        .findByIdAndUpdate(campaign, { $inc: { "stats.totalLeads": 1 } });
     }
 
     // Populate for response
@@ -121,14 +122,14 @@ exports.createLeadFromForm = async (req, res) => {
     });
   } catch (error) {
     console.error("Create Lead Error:", error);
-    
+
     if (error.code === 11000) {
       return res.status(400).json({
         success: false,
         message: "Lead with this phone already exists",
       });
     }
-    
+
     res.status(500).json({
       success: false,
       message: "Server error",
@@ -518,6 +519,201 @@ exports.getAssignedLeads = async (req, res) => {
     });
   } catch (error) {
     console.error("Get Assigned Leads Error:", error);
+    res.status(500).json({ success: false, message: "Server error" });
+  }
+};
+
+/**
+ * @route   GET /api/leads/check-phone
+ * @desc    Check lead existence by phone. Returns one of:
+ *          - { notexist: true }
+ *          - { assignself: true, leadId }
+ *          - { assignedTo: { id, name } }
+ * @access  Authenticated users
+ */
+exports.checkLeadByPhone = async (req, res) => {
+  try {
+    const phone = req.query.phone || req.body.phone;
+    if (!phone) {
+      return res
+        .status(400)
+        .json({ success: false, message: "phone is required" });
+    }
+
+    const lead = await Lead.findOne({
+      phone,
+      companyId: req.user.companyId,
+      isDeleted: false,
+    });
+
+    if (!lead) {
+      return res.status(200).json({ success: true, notexist: true });
+    }
+
+    if (!lead.assigned_to) {
+      return res
+        .status(200)
+        .json({ success: true, assignself: true, leadId: lead._id });
+    }
+
+    // assigned_to exists — return assignee name
+    const assignee = await User.findById(lead.assigned_to).select("name");
+    return res.status(200).json({
+      success: true,
+      assignedTo: assignee ? { id: assignee._id, name: assignee.name } : null,
+    });
+  } catch (error) {
+    console.error("Check Lead By Phone Error:", error);
+    res.status(500).json({ success: false, message: "Server error" });
+  }
+};
+
+/**
+ * @route   POST /api/leads/create-and-assign
+ * @desc    Create lead (if not exists) and assign to a salesperson.
+ *          Admins may provide `assignedTo`; Salesperson will be assigned to self.
+ * @access  Admin, Salesperson
+ */
+exports.createAndAssignLead = async (req, res) => {
+  try {
+    const {
+      firstName,
+      lastName,
+      phone,
+      email = null,
+      alt_phone = null,
+      tag,
+      activity,
+      platform,
+      leadSource = LEAD_SOURCE.MANUAL || "manual",
+      assignedTo,
+    } = req.body;
+
+    if (!firstName || !lastName || !phone) {
+      return res
+        .status(400)
+        .json({
+          success: false,
+          message: "firstName, lastName and phone required",
+        });
+    }
+
+    // Check duplicate
+    const existing = await Lead.findOne({
+      phone,
+      companyId: req.user.companyId,
+      isDeleted: false,
+    });
+    if (existing) {
+      return res.status(400).json({
+        success: false,
+        message: "Lead with this phone already exists",
+        data: existing,
+      });
+    }
+
+    // Determine assignee: Admin can provide assignedTo, Salesperson gets self
+    let assigneeId = null;
+    if (req.user.role === ROLES.ADMIN && assignedTo) {
+      // verify assignee is valid salesperson in company
+      const u = await User.findById(assignedTo);
+      if (!u)
+        return res
+          .status(404)
+          .json({ success: false, message: "Assignee not found" });
+      if (
+        u.role !== ROLES.SALESPERSON ||
+        (u.companyId &&
+          u.companyId.toString() !== req.user.companyId.toString())
+      ) {
+        return res
+          .status(400)
+          .json({ success: false, message: "Invalid assignee" });
+      }
+      assigneeId = u._id;
+    } else if (req.user.role === ROLES.SALESPERSON) {
+      assigneeId = req.user._id;
+    }
+
+    const leadData = {
+      firstName,
+      lastName,
+      email,
+      phone,
+      alt_phone,
+      tag,
+      activity,
+      platform,
+      leadSource,
+      leadStatus: LEAD_STATUS.NEW || "new",
+      companyId: req.user.companyId,
+      assigned_to: assigneeId,
+      assigned_by: assigneeId ? req.user._id : null,
+    };
+
+    const lead = await Lead.create(leadData);
+
+    const populated = await Lead.findById(lead._id).populate(
+      "assigned_to",
+      "name",
+    );
+
+    res
+      .status(201)
+      .json({ success: true, message: "Lead created", data: populated });
+  } catch (error) {
+    console.error("Create And Assign Lead Error:", error);
+    if (error.code === 11000) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Duplicate lead" });
+    }
+    res.status(500).json({ success: false, message: "Server error" });
+  }
+};
+
+/**
+ * @route   POST /api/leads/assign-self
+ * @desc    Assign an unassigned lead to the calling salesperson.
+ * @access  Salesperson
+ */
+exports.assignLeadToSelf = async (req, res) => {
+  try {
+    const { leadId, phone } = req.body;
+    if (!leadId && !phone) {
+      return res
+        .status(400)
+        .json({ success: false, message: "leadId or phone required" });
+    }
+
+    const filter = {
+      companyId: req.user.companyId,
+      isDeleted: false,
+    };
+    if (leadId) filter._id = leadId;
+    else filter.phone = phone;
+
+    const lead = await Lead.findOne(filter);
+    if (!lead)
+      return res
+        .status(404)
+        .json({ success: false, message: "Lead not found" });
+
+    if (lead.assigned_to) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Lead already assigned" });
+    }
+
+    lead.assigned_to = req.user._id;
+    lead.assigned_by = req.user._id;
+    await lead.save();
+
+    res
+      .status(200)
+      .json({ success: true, message: "Assigned to self", data: lead });
+  } catch (error) {
+    console.error("Assign Lead To Self Error:", error);
     res.status(500).json({ success: false, message: "Server error" });
   }
 };
