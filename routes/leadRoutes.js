@@ -16,6 +16,12 @@ const {
   getSingleLead,
   updateLeadBySalesperson,
   deleteLead,
+  checkLeadByPhone,
+  createAndAssignLead,
+  assignLeadToSelf,
+  filterLeads,
+  filterAllLeads,
+  exportLeads,
 } = require("../controllers/leadController");
 
 const { importLeads } = require("../controllers/leadImportController");
@@ -122,5 +128,36 @@ router.post(
   upload.single("file"),
   importLeads,
 );
+
+/**
+ * Create lead and assign (Admin or Salesperson)
+ * POST /api/leads/create-and-assign
+ */
+router.post(
+  "/create-and-assign",
+  auth,
+  authorize(ROLES.ADMIN, ROLES.SALESPERSON),
+  createAndAssignLead,
+);
+
+/**
+ * Salesperson assigns an unassigned lead to self
+ * POST /api/leads/assign-self
+ */
+router.post(
+  "/assign-self",
+  auth,
+  authorize(ROLES.SALESPERSON),
+  assignLeadToSelf,
+);
+
+// Filter with pagination (for listing)
+router.get("/filter", auth, authorize(ROLES.ADMIN), filterLeads);
+
+// Filter ALL without pagination (for export)
+router.get("/filter-all", auth, authorize(ROLES.ADMIN), filterAllLeads);
+
+// Export filtered leads
+router.get("/export", auth, authorize(ROLES.ADMIN), exportLeads);
 
 module.exports = router;
