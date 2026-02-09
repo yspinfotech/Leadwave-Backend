@@ -535,8 +535,8 @@ exports.getAssignedLeads = async (req, res) => {
  */
 exports.filterLeads = async (req, res) => {
   try {
-    console.log('Filter leads request received:', req.query);
-    console.log('User companyId:', req.user.companyId);
+    // console.log('Filter leads request received:', req.query);
+    // console.log('User companyId:', req.user.companyId);
 
     if (!req.user.companyId) {
       return res.status(403).json({
