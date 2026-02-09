@@ -6,7 +6,7 @@ const auth = require("../middleware/auth");
 const authorize = require("../middleware/authorize");
 const {
   createAdmin,
-  createSalesperson,
+  createUser,
   getAdmins,
   getUsers,
   getUserById,
@@ -35,7 +35,7 @@ router.get("/admins", auth, authorize(ROLES.SUPERADMIN), getAdmins);
  * @desc    Admin creates Salesperson
  * @access  Admin
  */
-router.post("/salesperson", auth, authorize(ROLES.ADMIN), createSalesperson);
+router.post("/create", auth, authorize(ROLES.ADMIN), createUser);
 
 /**
  * @route   GET /api/users

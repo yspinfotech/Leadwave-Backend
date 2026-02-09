@@ -54,9 +54,9 @@ exports.createAdmin = async (req, res) => {
  * @desc    Admin creates Salesperson
  * @access  Admin
  */
-exports.createSalesperson = async (req, res) => {
+exports.createUser = async (req, res) => {
   try {
-    const { name, email, password, mobile, city } = req.body;
+    const { name, email, password, mobile, city, role } = req.body;
 
     if (!name || !email || !password) {
       return res.status(400).json({
@@ -73,20 +73,20 @@ exports.createSalesperson = async (req, res) => {
       });
     }
 
-    const salesperson = await User.create({
+    const UserData = await User.create({
       companyId: req.user.companyId, // Admin’s company
       name,
       email,
       password,
       mobile,
       city,
-      role: ROLES.MANAGER,
+      role,
     });
 
     res.status(201).json({
       success: true,
-      message: "Salesperson created successfully",
-      data: salesperson,
+      message: "User created successfully",
+      data: UserData,
     });
   } catch (error) {
     console.error(error);
