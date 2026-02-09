@@ -1,3 +1,4 @@
+// models/Lead.js - Add campaign field
 const mongoose = require("mongoose");
 const { LEAD_SOURCE, LEAD_STATUS } = require("../config/leadEnums");
 
@@ -61,19 +62,15 @@ const LeadSchema = new mongoose.Schema(
     leadSource: {
       type: String,
       required: true,
-      default: "file", // default for import
     },
     tag: {
       type: String,
-      required: true,
     },
     platform: {
       type: String,
-      required: true,
     },
     activity: {
       type: String,
-      required: true,
     },
     leadStatus: {
       type: String,
@@ -116,7 +113,7 @@ const LeadSchema = new mongoose.Schema(
     ===================== */
     expectedValue: {
       type: Number,
-      default: null, // added by salesperson after contact
+      default: null,
     },
 
     last_contacted_date: {
@@ -127,32 +124,6 @@ const LeadSchema = new mongoose.Schema(
     next_followup_date: {
       type: Date,
       default: null,
-    },
-
-    /* =====================
-       LEAD DISTRIBUTION DATA
-       (For campaign-based distribution)
-    ===================== */
-    distributionData: {
-      assignedBy: {
-        type: String,
-        enum: ["manual", "ondemand", "equal", "conditional"],
-        default: "manual",
-      },
-      assignmentDate: {
-        type: Date,
-      },
-      campaignAssignmentDate: {
-        type: Date,
-      },
-      distributionRule: {
-        type: mongoose.Schema.Types.Mixed,
-        default: null,
-      },
-      autoAssigned: {
-        type: Boolean,
-        default: false,
-      },
     },
 
     /* =====================
@@ -189,78 +160,15 @@ const LeadSchema = new mongoose.Schema(
   },
 );
 
-/* 🔍 Avoid duplicate leads per company */
-LeadSchema.index(
-  { companyId: 1, phone: 1 },
-  { unique: true, partialFilterExpression: { isDeleted: false } },
-);
-
-/* 🔍 Index for campaign queries */
+// Indexes
+LeadSchema.index({ phone: 1, companyId: 1 }, { unique: true });
 LeadSchema.index({ campaign: 1, leadStatus: 1 });
 LeadSchema.index({ campaign: 1, assigned_to: 1 });
-LeadSchema.index({ campaign: 1, companyId: 1 });
+LeadSchema.index({ companyId: 1, isDeleted: 1 });
 
-/* 🔍 Compound index for performance */
-LeadSchema.index({ 
-  companyId: 1, 
-  campaign: 1, 
-  leadStatus: 1, 
-  assigned_to: 1 
-});
-
-/* 📊 Virtual for full name */
+// Virtuals
 LeadSchema.virtual("fullName").get(function () {
   return `${this.firstName} ${this.lastName}`;
 });
-
-/* 📊 Virtual for campaign stats */
-LeadSchema.virtual("campaignInfo", {
-  ref: "Campaign",
-  localField: "campaign",
-  foreignField: "_id",
-  justOne: true,
-});
-
-/* 🏗️ Pre-save middleware */
-LeadSchema.pre("save", function (next) {
-  // Update distribution data when campaign is assigned
-  if (this.isModified("campaign") && this.campaign) {
-    this.distributionData.campaignAssignmentDate = new Date();
-    this.distributionData.assignedBy = "ondemand"; // Default for campaign assignment
-  }
-  
-  // Update assignment date when assigned_to changes
-  if (this.isModified("assigned_to") && this.assigned_to) {
-    this.distributionData.assignmentDate = new Date();
-    this.distributionData.autoAssigned = this.distributionData.assignedBy !== "manual";
-  }
-  
-  next();
-});
-
-/* 🔄 Methods */
-LeadSchema.methods.assignToCampaign = async function (campaignId, assignmentType = "ondemand") {
-  this.campaign = campaignId;
-  this.distributionData.assignedBy = assignmentType;
-  this.distributionData.campaignAssignmentDate = new Date();
-  return this.save();
-};
-
-LeadSchema.methods.assignToAgent = async function (agentId, assignmentType = "manual") {
-  this.assigned_to = agentId;
-  this.distributionData.assignedBy = assignmentType;
-  this.distributionData.assignmentDate = new Date();
-  this.distributionData.autoAssigned = assignmentType !== "manual";
-  return this.save();
-};
-
-LeadSchema.methods.addNote = async function (noteData, userId) {
-  this.notes.push({
-    note_desc: noteData.note_desc,
-    addedBy: userId,
-    createdTime: new Date(),
-  });
-  return this.save();
-};
 
 module.exports = mongoose.model("Lead", LeadSchema);

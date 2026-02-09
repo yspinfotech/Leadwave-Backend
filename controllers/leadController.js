@@ -4,9 +4,10 @@ const { LEAD_SOURCE, LEAD_STATUS } = require("../config/leadEnums");
 const User = require("../models/User");
 const ROLES = require("../config/roles");
 
+// controllers/leadController.js - Updated createLeadFromForm
 /**
  * @route   POST /api/leads
- * @desc    Admin adds lead from form
+ * @desc    Admin adds lead from form (with campaign support)
  * @access  Admin only
  */
 exports.createLeadFromForm = async (req, res) => {
@@ -17,43 +18,56 @@ exports.createLeadFromForm = async (req, res) => {
       email,
       phone,
       alt_phone,
+      leadSource = "manual",
       tag,
-      activity,
       platform,
-      leadSource,
+      activity,
+      notes,
+      campaign, // New: campaign ID
     } = req.body;
 
     /* =====================
        VALIDATION
     ===================== */
-    if (!firstName || !lastName || !phone || !email) {
+    if (!firstName || !lastName || !phone) {
       return res.status(400).json({
         success: false,
-        message: "First name, last name, email and phone are required",
+        message: "First name, last name and phone are required",
       });
     }
 
+    // Validate campaign if provided
+    if (campaign) {
+      const campaignExists = await mongoose.model("Campaign").findOne({
+        _id: campaign,
+        companyId: req.user.companyId,
+      });
+      
+      if (!campaignExists) {
+        return res.status(400).json({
+          success: false,
+          message: "Invalid campaign selected",
+        });
+      }
+    }
+
+    // Check for duplicate lead
     const dupFilter = {
       companyId: req.user.companyId,
       isDeleted: false,
-      $or: [],
+      phone: phone,
     };
-    if (phone) dupFilter.$or.push({ phone });
-    if (email) dupFilter.$or.push({ email });
 
-    let existingLead = null;
-    if (dupFilter.$or.length > 0) {
-      existingLead = await Lead.findOneAndUpdate(
-        dupFilter,
-        { $inc: { start: 1 } },
-        { new: true },
-      );
-    }
+    const existingLead = await Lead.findOne(dupFilter);
 
     if (existingLead) {
+      // Update star for duplicate
+      existingLead.star += 1;
+      await existingLead.save();
+      
       return res.status(200).json({
         success: true,
-        message: "Existing lead found; incremented start counter",
+        message: "Existing lead found; star incremented",
         data: existingLead,
       });
     }
@@ -61,31 +75,60 @@ exports.createLeadFromForm = async (req, res) => {
     /* =====================
        CREATE LEAD
     ===================== */
-    const lead = await Lead.create({
+    const leadData = {
       firstName,
       lastName,
       email,
       phone,
       alt_phone,
+      leadSource,
       tag,
       activity,
       platform,
-      leadSource,
-      leadStatus: LEAD_STATUS.NEW,
-
+      leadStatus: "new",
       companyId: req.user.companyId,
+      campaign: campaign || null, // Add campaign
+    };
 
-      assigned_to: null,
-      assigned_by: null,
-    });
+    // Add note if provided
+    if (notes) {
+      leadData.notes = [{
+        note_desc: notes,
+        addedBy: req.user._id,
+        createdTime: new Date(),
+      }];
+    }
+
+    const lead = await Lead.create(leadData);
+
+    // Update campaign stats if campaign is assigned
+    if (campaign) {
+      await mongoose.model("Campaign").findByIdAndUpdate(
+        campaign,
+        { $inc: { 'stats.totalLeads': 1 } }
+      );
+    }
+
+    // Populate for response
+    const populatedLead = await Lead.findById(lead._id)
+      .populate("campaign", "name status")
+      .populate("assigned_to", "name email");
 
     res.status(201).json({
       success: true,
       message: "Lead created successfully",
-      data: lead,
+      data: populatedLead,
     });
   } catch (error) {
     console.error("Create Lead Error:", error);
+    
+    if (error.code === 11000) {
+      return res.status(400).json({
+        success: false,
+        message: "Lead with this phone already exists",
+      });
+    }
+    
     res.status(500).json({
       success: false,
       message: "Server error",

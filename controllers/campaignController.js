@@ -3,6 +3,7 @@ const Campaign = require("../models/Campaign");
 const User = require("../models/User");
 const Lead = require("../models/Lead");
 
+// controllers/campaignController.js - Updated getCampaigns
 // @desc    Get all campaigns
 // @route   GET /api/campaigns
 // @access  Private
@@ -12,8 +13,10 @@ exports.getCampaigns = async (req, res) => {
     const limit = parseInt(req.query.limit) || 10;
     const skip = (page - 1) * limit;
 
-    // Build filter object
-    const filter = {};
+    // Build filter object - ADD COMPANY FILTER
+    const filter = {
+      companyId: req.user.companyId
+    };
 
     if (req.query.search) {
       filter.name = { $regex: req.query.search, $options: "i" };
@@ -64,7 +67,6 @@ exports.getCampaigns = async (req, res) => {
     });
   }
 };
-
 // @desc    Get single campaign
 // @route   GET /api/campaigns/:id
 // @access  Private
