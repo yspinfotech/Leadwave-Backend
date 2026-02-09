@@ -37,4 +37,11 @@ PIPELINE_TYPE : {
   PRODUCT: "product",
   CUSTOM: "custom",
 },
+  LEAD_SOURCE: {
+    ONLINE_PLATFORM: 'Online Platform',
+    OFFLINE_CAMPAIGN: 'Offline Campaign',
+    LEAD_GENERATION: 'Lead Generation (Marketing Team)',
+    ORGANIC: 'Organic',
+    OTHER: 'Other'
+  },
 };

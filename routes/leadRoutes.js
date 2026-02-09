@@ -16,9 +16,6 @@ const {
   getSingleLead,
   updateLeadBySalesperson,
   deleteLead,
-  checkLeadByPhone,
-  createAndAssignLead,
-  assignLeadToSelf,
 } = require("../controllers/leadController");
 
 const { importLeads } = require("../controllers/leadImportController");
@@ -124,28 +121,6 @@ router.post(
   authorize(ROLES.ADMIN),
   upload.single("file"),
   importLeads,
-);
-
-/**
- * Create lead and assign (Admin or Salesperson)
- * POST /api/leads/create-and-assign
- */
-router.post(
-  "/create-and-assign",
-  auth,
-  authorize(ROLES.ADMIN, ROLES.SALESPERSON),
-  createAndAssignLead,
-);
-
-/**
- * Salesperson assigns an unassigned lead to self
- * POST /api/leads/assign-self
- */
-router.post(
-  "/assign-self",
-  auth,
-  authorize(ROLES.SALESPERSON),
-  assignLeadToSelf,
 );
 
 module.exports = router;
