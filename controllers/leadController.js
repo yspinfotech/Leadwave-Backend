@@ -3,7 +3,8 @@ const Lead = require("../models/Lead");
 const { LEAD_SOURCE, LEAD_STATUS } = require("../config/leadEnums");
 const User = require("../models/User");
 const ROLES = require("../config/roles");
-
+const XLSX = require("xlsx");
+const { Parser } = require('json2csv');
 // controllers/leadController.js - Updated createLeadFromForm
 /**
  * @route   POST /api/leads
@@ -42,7 +43,7 @@ exports.createLeadFromForm = async (req, res) => {
         _id: campaign,
         companyId: req.user.companyId,
       });
-      
+
       if (!campaignExists) {
         return res.status(400).json({
           success: false,
@@ -64,7 +65,7 @@ exports.createLeadFromForm = async (req, res) => {
       // Update star for duplicate
       existingLead.star += 1;
       await existingLead.save();
-      
+
       return res.status(200).json({
         success: true,
         message: "Existing lead found; star incremented",
@@ -121,14 +122,14 @@ exports.createLeadFromForm = async (req, res) => {
     });
   } catch (error) {
     console.error("Create Lead Error:", error);
-    
+
     if (error.code === 11000) {
       return res.status(400).json({
         success: false,
         message: "Lead with this phone already exists",
       });
     }
-    
+
     res.status(500).json({
       success: false,
       message: "Server error",
@@ -520,4 +521,413 @@ exports.getAssignedLeads = async (req, res) => {
     console.error("Get Assigned Leads Error:", error);
     res.status(500).json({ success: false, message: "Server error" });
   }
+};
+
+
+
+
+
+
+/**
+ * @route   GET /api/leads/filter
+ * @desc    Filter leads with pagination (for UI display)
+ * @access  Private
+ */
+exports.filterLeads = async (req, res) => {
+  try {
+    console.log('Filter leads request received:', req.query);
+    console.log('User companyId:', req.user.companyId);
+
+    if (!req.user.companyId) {
+      return res.status(403).json({
+        success: false,
+        message: 'Access denied: User is not associated with any company'
+      });
+    }
+
+    const {
+      page = 1,
+      limit = 10,
+      sortBy = 'created',
+      sortOrder = 'desc',
+      ...filters
+    } = req.query;
+
+    // Build filter query - ALWAYS filter by companyId
+    let filter = {
+      companyId: req.user.companyId,
+      isDeleted: false
+    };
+
+    // Apply additional filters
+    filter = applyFilters(filter, filters);
+
+    console.log('Final filter:', JSON.stringify(filter, null, 2));
+
+    // Build sort
+    const sort = {};
+    if (sortBy) {
+      sort[sortBy] = sortOrder === 'asc' ? 1 : -1;
+    } else {
+      sort.created = -1;
+    }
+
+    // Calculate pagination
+    const pageNum = parseInt(page);
+    const limitNum = parseInt(limit);
+    const skip = (pageNum - 1) * limitNum;
+
+    // Get total count for pagination
+    const total = await Lead.countDocuments(filter);
+    
+    // Fetch paginated leads
+    const leads = await Lead.find(filter)
+      .populate('assigned_to', 'name email')
+      .populate('campaign', 'name')
+      .sort(sort)
+      .skip(skip)
+      .limit(limitNum)
+      .lean();
+
+    const totalPages = Math.ceil(total / limitNum);
+
+    console.log(`Found ${total} leads, showing ${leads.length} on page ${pageNum}`);
+
+    res.status(200).json({
+      success: true,
+      count: leads.length,
+      total,
+      page: pageNum,
+      totalPages,
+      limit: limitNum,
+      data: leads
+    });
+
+  } catch (error) {
+    console.error('Filter leads error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to filter leads',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+};
+
+/**
+ * @route   GET /api/leads/filter-all
+ * @desc    Filter ALL leads without pagination (for export)
+ * @access  Private
+ */
+exports.filterAllLeads = async (req, res) => {
+  try {
+    console.log('Filter all leads request received:', req.query);
+    
+    if (!req.user.companyId) {
+      return res.status(403).json({
+        success: false,
+        message: 'Access denied: User is not associated with any company'
+      });
+    }
+
+    const {
+      sortBy = 'created',
+      sortOrder = 'desc',
+      ...filters
+    } = req.query;
+
+    // Build filter query - ALWAYS filter by companyId
+    let filter = {
+      companyId: req.user.companyId,
+      isDeleted: false
+    };
+
+    // Apply additional filters
+    filter = applyFilters(filter, filters);
+
+    // Build sort
+    const sort = {};
+    if (sortBy) {
+      sort[sortBy] = sortOrder === 'asc' ? 1 : -1;
+    } else {
+      sort.created = -1;
+    }
+
+    console.log('Filter for all leads:', JSON.stringify(filter, null, 2));
+
+    // Fetch ALL leads without pagination
+    const leads = await Lead.find(filter)
+      .populate('assigned_to', 'name email')
+      .populate('campaign', 'name')
+      .sort(sort)
+      .lean();
+
+    console.log(`Found ${leads.length} leads for export`);
+
+    res.status(200).json({
+      success: true,
+      count: leads.length,
+      data: leads
+    });
+
+  } catch (error) {
+    console.error('Filter all leads error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to filter leads',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+};
+
+/**
+ * @route   GET /api/leads/export
+ * @desc    Export filtered leads as CSV or Excel
+ * @access  Private
+ */
+exports.exportLeads = async (req, res) => {
+  try {
+    console.log('Export leads request received:', req.query);
+    
+    if (!req.user.companyId) {
+      return res.status(403).json({
+        success: false,
+        message: 'Access denied: User is not associated with any company'
+      });
+    }
+
+    const {
+      format = 'excel',
+      columns = 'all',
+      ...filters
+    } = req.query;
+
+    // Build filter query - ALWAYS filter by companyId
+    let filter = {
+      companyId: req.user.companyId,
+      isDeleted: false
+    };
+
+    // Apply filters
+    filter = applyFilters(filter, filters);
+
+    console.log('Export filter:', JSON.stringify(filter, null, 2));
+
+    // Fetch ALL leads for export
+    const leads = await Lead.find(filter)
+      .populate('assigned_to', 'name email')
+      .populate('campaign', 'name')
+      .sort({ created: -1 })
+      .lean();
+
+    if (leads.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'No leads found with the given filters'
+      });
+    }
+
+    console.log(`Exporting ${leads.length} leads`);
+
+    // Prepare data for export
+    const exportData = leads.map(lead => {
+      const row = {
+        'First Name': lead.firstName || '',
+        'Last Name': lead.lastName || '',
+        'Full Name': `${lead.firstName || ''} ${lead.lastName || ''}`.trim(),
+        'Email': lead.email || '',
+        'Phone': lead.phone || '',
+        'Alternate Phone': lead.alt_phone || '',
+        'Lead Status': lead.leadStatus || '',
+        'Lead Source': lead.leadSource || '',
+        'Tag': lead.tag || '',
+        'Platform': lead.platform || '',
+        'Activity': lead.activity || '',
+        'Star Rating': lead.star || 1,
+        'Assigned To': lead.assigned_to?.name || 'Unassigned',
+        'Assigned Email': lead.assigned_to?.email || '',
+        'Campaign': lead.campaign?.name || '',
+        'Created Date': lead.created ? new Date(lead.created).toLocaleString() : '',
+        'Updated Date': lead.updated ? new Date(lead.updated).toLocaleString() : '',
+        'Notes Count': lead.notes?.length || 0,
+        'Last Contacted': lead.last_contacted_date ? new Date(lead.last_contacted_date).toLocaleString() : '',
+        'Next Followup': lead.next_followup_date ? new Date(lead.next_followup_date).toLocaleString() : '',
+        'Expected Value': lead.expectedValue || 0,
+        'Company ID': lead.companyId || ''
+      };
+
+      // Add notes if they exist
+      if (lead.notes && lead.notes.length > 0) {
+        row['Notes'] = lead.notes.map(note => note.note_desc).join(' | ');
+      }
+
+      return row;
+    });
+
+    // Filter columns if specified
+    let finalData = exportData;
+    if (columns !== 'all') {
+      const selectedColumns = columns.split(',').map(col => col.trim());
+      finalData = exportData.map(row => {
+        const filteredRow = {};
+        selectedColumns.forEach(col => {
+          if (row[col] !== undefined) {
+            filteredRow[col] = row[col];
+          }
+        });
+        return filteredRow;
+      });
+    }
+
+    // Generate filename
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+    const filterStr = Object.keys(filters).length > 0 ? '_filtered' : '';
+    
+    if (format === 'excel') {
+      const filename = `leads_export_${timestamp}${filterStr}.xlsx`;
+      
+      // Create Excel workbook
+      const workbook = XLSX.utils.book_new();
+      const worksheet = XLSX.utils.json_to_sheet(finalData);
+      
+      // Auto-size columns
+      const maxWidth = finalData.reduce((w, r) => Math.max(w, Object.keys(r).length), 10);
+      worksheet['!cols'] = Array(maxWidth).fill({ wch: 20 });
+      
+      XLSX.utils.book_append_sheet(workbook, worksheet, 'Leads');
+      
+      // Write to buffer
+      const excelBuffer = XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' });
+      
+      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+      res.send(excelBuffer);
+      
+    } else if (format === 'csv') {
+      const filename = `leads_export_${timestamp}${filterStr}.csv`;
+      
+      // Convert to CSV
+      const json2csvParser = new Parser();
+      const csv = json2csvParser.parse(finalData);
+      
+      res.setHeader('Content-Type', 'text/csv');
+      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+      res.send(csv);
+      
+    } else {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid format. Use "excel" or "csv"'
+      });
+    }
+
+  } catch (error) {
+    console.error('Export leads error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to export leads',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+};
+
+
+/**
+ * Helper function to apply filters to query
+ */
+const applyFilters = (filter, query) => {
+  const {
+    search,
+    leadStatus,
+    leadSource,
+    tag,
+    platform,
+    activity,
+    dateRange,
+    startDate,
+    endDate,
+    assignedStatus
+  } = query;
+
+  // Search filter (name, email, phone)
+  if (search) {
+    filter.$or = [
+      { firstName: { $regex: search, $options: 'i' } },
+      { lastName: { $regex: search, $options: 'i' } },
+      { email: { $regex: search, $options: 'i' } },
+      { phone: { $regex: search, $options: 'i' } },
+      { alt_phone: { $regex: search, $options: 'i' } }
+    ];
+  }
+
+  // Lead status filter
+  if (leadStatus) {
+    filter.leadStatus = leadStatus;
+  }
+
+  // Hierarchy filters
+  if (leadSource) {
+    filter.leadSource = leadSource;
+  }
+  if (tag) {
+    filter.tag = tag;
+  }
+  if (platform) {
+    filter.platform = platform;
+  }
+  if (activity) {
+    filter.activity = activity;
+  }
+
+  // Date range filter
+  const now = new Date();
+  if (dateRange === 'today') {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    filter.created = { $gte: today, $lt: tomorrow };
+  } else if (dateRange === 'yesterday') {
+    const yesterday = new Date();
+    yesterday.setDate(yesterday.getDate() - 1);
+    yesterday.setHours(0, 0, 0, 0);
+    filter.created = { $gte: yesterday, $lt: new Date(yesterday.getTime() + 24 * 60 * 60 * 1000) };
+  } else if (dateRange === 'thisWeek') {
+    const today = new Date();
+    const startOfWeek = new Date(today);
+    startOfWeek.setDate(today.getDate() - today.getDay());
+    startOfWeek.setHours(0, 0, 0, 0);
+    filter.created = { $gte: startOfWeek };
+  } else if (dateRange === 'lastWeek') {
+    const today = new Date();
+    const startOfLastWeek = new Date(today);
+    startOfLastWeek.setDate(today.getDate() - today.getDay() - 7);
+    startOfLastWeek.setHours(0, 0, 0, 0);
+    const endOfLastWeek = new Date(startOfLastWeek);
+    endOfLastWeek.setDate(endOfLastWeek.getDate() + 7);
+    filter.created = { $gte: startOfLastWeek, $lt: endOfLastWeek };
+  } else if (dateRange === 'thisMonth') {
+    const today = new Date();
+    const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+    filter.created = { $gte: startOfMonth };
+  } else if (dateRange === 'lastMonth') {
+    const today = new Date();
+    const startOfLastMonth = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+    const startOfThisMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+    filter.created = { $gte: startOfLastMonth, $lt: startOfThisMonth };
+  } else if (dateRange === 'custom' && startDate && endDate) {
+    const start = new Date(startDate);
+    start.setHours(0, 0, 0, 0);
+    const end = new Date(endDate);
+    end.setHours(23, 59, 59, 999);
+    filter.created = { $gte: start, $lte: end };
+  }
+
+  // Assigned status filter
+  if (assignedStatus === 'assigned') {
+    filter.assigned_to = { $exists: true, $ne: null };
+  } else if (assignedStatus === 'unassigned') {
+    filter.assigned_to = { $eq: null };
+  }
+
+  return filter;
 };
