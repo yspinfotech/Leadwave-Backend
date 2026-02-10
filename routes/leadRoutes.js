@@ -18,7 +18,9 @@ const {
   deleteLead,
   filterLeads,
   filterAllLeads,
-  exportLeads
+  exportLeads,
+  managerFilterLeads,
+  managerFilterAllLeads
 } = require("../controllers/leadController");
 
 const { importLeads } = require("../controllers/leadImportController");
@@ -121,13 +123,13 @@ router.post(
 );
 
 
-
-
 // Filter with pagination (for listing)
 router.get('/filter', auth, authorize(ROLES.ADMIN), filterLeads);
+router.get('/manager-filter', auth, authorize( ROLES.MANAGER), managerFilterLeads);
 
 // Filter ALL without pagination (for export)
 router.get('/filter-all', auth, authorize(ROLES.ADMIN), filterAllLeads);
+router.get('/manager-filter-all', auth, authorize(ROLES.ADMIN), managerFilterAllLeads);
 
 // Export filtered leads
 router.get('/export', auth, authorize(ROLES.ADMIN), exportLeads);

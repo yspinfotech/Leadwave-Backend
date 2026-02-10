@@ -43,7 +43,7 @@ router.post("/create", auth, authorize(ROLES.ADMIN), createUser);
  * @access  Admin, SuperAdmin
  */
 // FIX: Use spread operator
-router.get("/", auth, authorize(ROLES.ADMIN, ROLES.SUPERADMIN), getUsers);
+router.get("/", auth, authorize(ROLES.ADMIN, ROLES.SUPERADMIN, ROLES.MANAGER), getUsers);
 
 /**
  * @route   GET /api/users/:id
@@ -51,7 +51,7 @@ router.get("/", auth, authorize(ROLES.ADMIN, ROLES.SUPERADMIN), getUsers);
  * @access  Admin, SuperAdmin
  */
 // FIX: Use spread operator
-router.get("/:id", auth, authorize(ROLES.ADMIN, ROLES.SUPERADMIN), getUserById);
+router.get("/:id", auth, authorize(ROLES.ADMIN, ROLES.SUPERADMIN, ROLES.MANAGER), getUserById);
 
 /**
  * @route   PUT /api/users/:id
