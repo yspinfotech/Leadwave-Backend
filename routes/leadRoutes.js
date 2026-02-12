@@ -75,7 +75,7 @@ router.put("/:id/assign", auth, authorize(ROLES.ADMIN), assignLead);
 router.put(
   "/update-by-salesperson",
   auth,
-  authorize(ROLES.SALESPERSON),
+  authorize(ROLES.SALESPERSON, ROLES.MANAGER),
   updateLeadBySalesperson,
 );
 
