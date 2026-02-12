@@ -57,7 +57,7 @@ router.get("/assigned", auth, getAssignedLeads);
  * =========================
  * PUT /api/leads/:id/assign
  */
-router.put("/:id/assign", auth, authorize(ROLES.ADMIN), assignLead);
+router.put("/:id/assign", auth, authorize(ROLES.ADMIN, ROLES.MANAGER), assignLead);
 
 /**
  * =========================
