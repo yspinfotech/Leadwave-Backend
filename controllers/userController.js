@@ -237,7 +237,7 @@ exports.getSelfProfile = async (req, res) => {
   try {
 
 
-    const userId = req.user._id;
+    const userId = "698c494f8eef3912f447e162";
 console.log(userId);
 
      const user = await User.findById(userId);
