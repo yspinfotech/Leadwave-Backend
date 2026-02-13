@@ -5,8 +5,8 @@ const rateLimit = require("express-rate-limit");
  * Prevents brute-force attacks
  */
 const loginLimiter = rateLimit({
-  windowMs: 1 * 1 * 1000, // 15 minutes
-  max: 5, // 5 attempts per IP
+  windowMs: 5 * 60 * 1000, // 15 minutes
+  max: 10, // 5 attempts per IP
   standardHeaders: true,
   legacyHeaders: false,
   message: {

@@ -12,7 +12,7 @@ const generateAccessToken = (user) => {
       companyId: user.companyId || null,
     },
     process.env.JWT_SECRET,
-    { expiresIn: "15m" }, // short-lived
+    { expiresIn: "7d" }, // short-lived
   );
 };
 
