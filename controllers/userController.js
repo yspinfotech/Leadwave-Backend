@@ -233,6 +233,33 @@ exports.getUserById = async (req, res) => {
     });
   }
 };
+exports.getSelfProfile = async (req, res) => {
+  try {
+    const userId = req.user._id;
+
+     const user = await User.findById(userId);
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found",
+      });
+    }
+
+    // Check permissions
+    
+    res.status(200).json({
+      success: true,
+      data: user,
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({
+      success: false,
+      message: "error", 
+    });
+  }
+};
 
 /**
  * @route   PUT /api/users/:id

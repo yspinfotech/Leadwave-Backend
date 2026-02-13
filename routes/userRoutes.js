@@ -13,6 +13,7 @@ const {
   getSalesUsersForAssignment,
   deleteUser,
   updateUser,
+  getSelfProfile
 } = require("../controllers/userController");
 
 const ROLES = require("../config/roles");
@@ -52,6 +53,8 @@ router.get("/", auth, authorize(ROLES.ADMIN, ROLES.SUPERADMIN, ROLES.MANAGER), g
  */
 // FIX: Use spread operator
 router.get("/:id", auth, authorize(ROLES.ADMIN, ROLES.SUPERADMIN, ROLES.MANAGER), getUserById);
+
+router.get("/profile", auth, authorize(ROLES.ADMIN, ROLES.SUPERADMIN, ROLES.MANAGER,ROLES.SALESPERSON), getSelfProfile);
 
 /**
  * @route   PUT /api/users/:id
