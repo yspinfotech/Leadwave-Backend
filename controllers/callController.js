@@ -169,7 +169,9 @@ exports.getCallsBySalesperson = async (req, res) => {
 
 exports.getCallsReports = async (req, res) => {
   try {
-    const { userId } = req.user._id;
+  
+    const  userId  = req.user._id;
+   
     const { start, end, page = 1, limit = 50 } = req.query;
 
     if (!mongoose.Types.ObjectId.isValid(userId)) {

@@ -36,7 +36,7 @@ router.get(
 );
 
 router.get(
-  "/reports/",
+  "/reports",
   auth,
   authorize(ROLES.SALESPERSON),
   getCallsReports,
