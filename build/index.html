@@ -12,88 +12,125 @@
     <link rel="stylesheet" href="/assets/vendors/css/vendors.min.css" />
     <link rel="stylesheet" href="/assets/vendors/css/daterangepicker.min.css" />
     <link rel="stylesheet" href="/assets/css/theme.min.css" />
-      <!-- Bootstrap CSS -->
-    <!-- <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet"> -->
-    <!-- NUCLEAR OPTION: BLOCK ALL EXTERNAL INTERFERENCE -->
+    
     <script>
-      // ====================================================
-      // CRITICAL: THIS PREVENTS PAGE RELOADS
-      // ====================================================
-      (function() {
-        console.log('🔐 Installing React Router protection...');
+  // ====================================================
+  // AGGRESSIVE jQuery PATCH - Block ALL jQuery click handlers on links
+  // ====================================================
+  (function() {
+    console.log('🔐 Installing React Router protection...');
+    
+    // 1. PATCH JQUERY - BLOCK ALL LINK CLICK HANDLERS
+    Object.defineProperty(window, 'jQuery', {
+      set: function(value) {
+        console.log('🛑 jQuery detected, patching...');
+        this._jQuery = value;
         
-        // 1. BLOCK ALL CLICK HANDLERS ON REACT LINKS
-        const originalAddEventListener = EventTarget.prototype.addEventListener;
-        EventTarget.prototype.addEventListener = function(type, listener, options) {
-          if (type === 'click' || type === 'submit') {
-            const isReactLink = this.tagName === 'A' && 
-                               this.getAttribute('href') && 
-                               this.getAttribute('href').startsWith('/');
-            
-            if (isReactLink) {
-              console.log('🚫 BLOCKED external handler on React link:', this.href);
-              return; // COMPLETELY BLOCK the handler
-            }
-          }
-          return originalAddEventListener.call(this, type, listener, options);
-        };
+        const $ = value;
+        const originalOn = $.fn.on;
         
-        // 2. INTERCEPT AND BLOCK JQUERY
-        Object.defineProperty(window, 'jQuery', {
-          set: function(value) {
-            console.log('🛑 jQuery detected, patching...');
-            
-            // Store original jQuery
-            this._jQuery = value;
-            
-            // Patch jQuery's event handling
-            const $ = value;
-            const originalOn = $.fn.on;
-            
-            $.fn.on = function(events, selector, data, handler) {
-              // BLOCK ALL jQuery click handlers on links
-              if (events === 'click' && selector && selector.includes('a[href')) {
-                console.log('🛑 Blocked jQuery handler for links');
-                return this;
+        // OVERRIDE jQuery's .on() method
+        $.fn.on = function(events, selector, data, handler) {
+          // BLOCK ALL click handlers that target anchor tags or elements with href
+          if (events === 'click' || events.includes('click')) {
+            // Check if selector is a string that targets links
+            if (typeof selector === 'string') {
+              const lowerSelector = selector.toLowerCase();
+              if (lowerSelector.includes('a') || 
+                  lowerSelector.includes('[href]') || 
+                  lowerSelector.includes('.nxl-link') ||
+                  lowerSelector.includes('.b-brand') ||
+                  lowerSelector === '*') {
+                console.log('🚫 Blocked jQuery click handler on:', selector);
+                return this; // DON'T attach the handler
               }
-              return originalOn.apply(this, arguments);
-            };
-            
-            console.log('✅ jQuery patched successfully');
-          },
-          get: function() {
-            return this._jQuery;
-          }
-        });
-        
-        // 3. PREVENT DEFAULT ON ALL INTERNAL LINKS
-        document.addEventListener('click', function(e) {
-          let target = e.target;
-          while (target && target.tagName !== 'A') {
-            target = target.parentElement;
+            }
           }
           
-          if (target && target.tagName === 'A') {
-            const href = target.getAttribute('href');
-            if (href && href.startsWith('/') && !href.startsWith('//')) {
-              e.preventDefault();
-              e.stopPropagation();
-              e.stopImmediatePropagation();
-              console.log('🛑 Prevented page reload on:', href);
-            }
-          }
-        }, true); // Use CAPTURE phase to intercept first
+          return originalOn.apply(this, arguments);
+        };
         
-        console.log('✅ React Router protection ACTIVE');
-      })();
-    </script>
-    <script type="module" crossorigin src="/assets/index-DQfSiqQw.js"></script>
-    <link rel="stylesheet" crossorigin href="/assets/index-CPg2V0sl.css">
+        // ALSO PATCH .click() method
+        const originalClick = $.fn.click;
+        $.fn.click = function(handler) {
+          if (handler && this.is('a, [href], .nxl-link, .b-brand')) {
+            console.log('🚫 Blocked jQuery .click() on link');
+            return this;
+          }
+          return originalClick.apply(this, arguments);
+        };
+        
+        console.log('✅ jQuery patched successfully');
+      },
+      get: function() {
+        return this._jQuery;
+      }
+    });
+    
+    // 2. NUCLEAR OPTION: Intercept ALL event listeners on links
+    const originalAddEventListener = EventTarget.prototype.addEventListener;
+    EventTarget.prototype.addEventListener = function(type, listener, options) {
+      // Check if this is a link element
+      const isLink = this.tagName === 'A' || 
+                     (this.tagName === 'BUTTON' && this.className.includes('nxl-link')) ||
+                     (this.getAttribute && this.getAttribute('href'));
+      
+      // Block jQuery/Javascript from adding click handlers to links
+      if (type === 'click' && isLink) {
+        // Check if it's from jQuery or legacy scripts
+        const listenerStr = listener.toString();
+        if (listenerStr.includes('jQuery') || 
+            listenerStr.includes('window.location') ||
+            listenerStr.includes('document.location') ||
+            listenerStr.includes('nxlNavigation')) {
+          console.log('🚫 Blocked external click handler on link');
+          return; // Don't add the handler
+        }
+      }
+      
+      return originalAddEventListener.call(this, type, listener, options);
+    };
+    
+    // 3. CATCH-ALL: Prevent default on any link click that would cause reload
+    document.addEventListener('click', function(e) {
+      const link = e.target.closest('a, .nxl-link, .b-brand, [href]');
+      
+      if (link) {
+        const href = link.getAttribute?.('href');
+        
+        // If it's an internal link that would cause page reload
+        if (href && href.startsWith('/') && !href.startsWith('//')) {
+          // Check if React Router should handle this
+          const isReactRouterLink = link.classList?.contains('nxl-link') || 
+                                   link.closest?.('.nxl-link') ||
+                                   link.hasAttribute?.('data-react-router');
+          
+          if (!isReactRouterLink) {
+            // For non-React links, prevent default and let React Router handle
+            e.preventDefault();
+            e.stopPropagation();
+            
+            // Try to navigate with React Router
+            if (window.__reactRouterNavigate) {
+              window.__reactRouterNavigate(href);
+            }
+            
+            console.log('🔄 Intercepted link click:', href);
+          }
+        }
+      }
+    }, true); // Capture phase
+    
+    console.log('✅ React Router protection ACTIVE');
+  })();
+</script>
+    <script type="module" crossorigin src="/assets/index-Bg94lAxZ.js"></script>
+    <link rel="stylesheet" crossorigin href="/assets/index-o62j2Mhq.css">
   </head>
   <body>
     <div id="root"></div>
     
-    <!-- Load scripts with defer -->
+    <!-- Load scripts with defer - UNCOMMENT THESE -->
     <script src="/assets/vendors/js/vendors.min.js" defer></script>
     <script src="/assets/vendors/js/daterangepicker.min.js" defer></script>
     <script src="/assets/vendors/js/apexcharts.min.js" defer></script>
@@ -101,5 +138,32 @@
     <script src="/assets/js/common-init.min.js" defer></script>
     <script src="/assets/js/dashboard-init.min.js" defer></script>
     <script src="/assets/js/theme-customizer-init.min.js" defer></script>
+    <script>
+  // NUCLEAR OPTION: Remove ALL jQuery click handlers from links
+  function nukeJQueryLinkHandlers() {
+    if (window.$) {
+      // Remove all click handlers from links
+      $('a, .nxl-link, [href]').off('click');
+      
+      // Also remove from parent elements that might delegate
+      $(document).off('click', 'a');
+      $(document).off('click', '.nxl-link');
+      $(document).off('click', '[href]');
+      
+      console.log('💣 Nuked all jQuery click handlers on links');
+    }
+  }
+
+  // Run after jQuery loads
+  Object.defineProperty(window, 'jQuery', {
+    set: function(value) {
+      this._jQuery = value;
+      setTimeout(nukeJQueryLinkHandlers, 0);
+    },
+    get: function() {
+      return this._jQuery;
+    }
+  });
+</script>
   </body>
 </html>
