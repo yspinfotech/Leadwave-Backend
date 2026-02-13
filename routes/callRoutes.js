@@ -12,6 +12,7 @@ const {
   getCallsByLead,
   getCallsBySalesperson,
   getCalls,
+  getCallsReports
 } = require("../controllers/callController");
 
 // Salesperson creates a call record
@@ -32,6 +33,13 @@ router.get(
   auth,
   authorize(ROLES.ADMIN),
   getCallsBySalesperson,
+);
+
+router.get(
+  "/reports",
+  auth,
+  authorize(ROLES.SALESPERSON),
+  getCallsReports,
 );
 
 // Admin overview

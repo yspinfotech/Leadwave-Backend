@@ -109,7 +109,7 @@ exports.createCampaign = async (req, res) => {
       description,
       manager,
       pipeline = "course",
-      agents = [],
+      // agents = [],
       leadDistribution = "ondemand",
       priority = "medium",
       status = "draft",
@@ -149,22 +149,22 @@ exports.createCampaign = async (req, res) => {
 
     // Validate agents exist and have appropriate roles
     let validatedAgents = [];
-    if (agents && agents.length > 0) {
-      const agentUsers = await User.find({ 
-        _id: { $in: agents },
-        role: { $in: ['salesperson', 'marketing'] }
-      });
+    // if (agents && agents.length > 0) {
+    //   const agentUsers = await User.find({ 
+    //     _id: { $in: agents },
+    //     role: { $in: ['salesperson', 'marketing'] }
+    //   });
       
-      // Check if all agents were found
-      if (agentUsers.length !== agents.length) {
-        return res.status(400).json({
-          success: false,
-          message: "Some selected agents are invalid or don't have appropriate roles",
-        });
-      }
+    //   // Check if all agents were found
+    //   if (agentUsers.length !== agents.length) {
+    //     return res.status(400).json({
+    //       success: false,
+    //       message: "Some selected agents are invalid or don't have appropriate roles",
+    //     });
+    //   }
 
-      validatedAgents = agents;
-    }
+    //   validatedAgents = agents;
+    // }
 
     // Create campaign with companyId and createdBy
     const campaignData = {
@@ -172,7 +172,7 @@ exports.createCampaign = async (req, res) => {
       description,
       manager,
       pipeline,
-      agents: validatedAgents,
+      // agents: validatedAgents,
       leadDistribution,
       priority,
       status,

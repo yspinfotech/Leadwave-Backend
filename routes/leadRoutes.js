@@ -22,6 +22,8 @@ const {
   filterLeads,
   filterAllLeads,
   exportLeads,
+  managerFilterLeads,
+  managerFilterAllLeads,
 } = require("../controllers/leadController");
 
 const { importLeads } = require("../controllers/leadImportController");
@@ -64,7 +66,12 @@ router.get("/check-phone", auth, checkLeadByPhone);
  * =========================
  * PUT /api/leads/:id/assign
  */
-router.put("/:id/assign", auth, authorize(ROLES.ADMIN), assignLead);
+router.put(
+  "/:id/assign",
+  auth,
+  authorize(ROLES.ADMIN, ROLES.MANAGER),
+  assignLead,
+);
 
 /**
  * =========================
@@ -82,7 +89,7 @@ router.put("/:id/assign", auth, authorize(ROLES.ADMIN), assignLead);
 router.put(
   "/update-by-salesperson",
   auth,
-  authorize(ROLES.SALESPERSON),
+  authorize(ROLES.SALESPERSON, ROLES.MANAGER),
   updateLeadBySalesperson,
 );
 
@@ -156,6 +163,23 @@ router.get("/filter", auth, authorize(ROLES.ADMIN), filterLeads);
 
 // Filter ALL without pagination (for export)
 router.get("/filter-all", auth, authorize(ROLES.ADMIN), filterAllLeads);
+// Filter with pagination (for listing)
+router.get("/filter", auth, authorize(ROLES.ADMIN), filterLeads);
+router.get(
+  "/manager-filter",
+  auth,
+  authorize(ROLES.MANAGER),
+  managerFilterLeads,
+);
+
+// Filter ALL without pagination (for export)
+router.get("/filter-all", auth, authorize(ROLES.ADMIN), filterAllLeads);
+router.get(
+  "/manager-filter-all",
+  auth,
+  authorize(ROLES.ADMIN),
+  managerFilterAllLeads,
+);
 
 // Export filtered leads
 router.get("/export", auth, authorize(ROLES.ADMIN), exportLeads);

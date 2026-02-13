@@ -1,5 +1,6 @@
 const mongoose = require("mongoose");
 const Lead = require("../models/Lead");
+const Campaign = require("../models/Campaign");
 const { LEAD_SOURCE, LEAD_STATUS } = require("../config/leadEnums");
 const User = require("../models/User");
 const ROLES = require("../config/roles");
@@ -803,6 +804,108 @@ exports.filterLeads = async (req, res) => {
   }
 };
 
+exports.managerFilterLeads = async (req, res) => {
+  try {
+    const userId = req.user._id;
+    const companyId = req.user.companyId;
+
+    if (!companyId) {
+      return res.status(403).json({
+        success: false,
+        message: "Access denied: User is not associated with any company",
+      });
+    }
+
+    // Find manager's campaigns
+    const campaigns = await Campaign.find({
+      manager: userId,
+      companyId: companyId,
+    }).select("_id");
+
+    if (campaigns.length === 0) {
+      return res.status(200).json({
+        success: true,
+        data: [],
+        count: 0,
+        total: 0,
+        page: 1,
+        totalPages: 0,
+      });
+    }
+
+    const campaignIds = campaigns.map((camp) => camp._id);
+
+    const {
+      page = 1,
+      limit = 10,
+      sortBy = "created",
+      sortOrder = "desc",
+      search = "",
+      ...filters
+    } = req.query;
+
+    // Build filter
+    let filter = {
+      companyId: companyId,
+      campaign: { $in: campaignIds },
+      isDeleted: false,
+    };
+
+    // Apply search
+    if (search) {
+      const searchRegex = new RegExp(search, "i");
+      filter.$or = [
+        { firstName: searchRegex },
+        { lastName: searchRegex },
+        { email: searchRegex },
+        { phone: searchRegex },
+      ];
+    }
+
+    // Apply other filters
+    Object.keys(filters).forEach((key) => {
+      if (filters[key] && filters[key] !== "" && filters[key] !== "all") {
+        filter[key] = filters[key];
+      }
+    });
+
+    // Sort
+    const sort = {};
+    sort[sortBy || "created"] = sortOrder === "asc" ? 1 : -1;
+
+    // Pagination
+    const pageNum = parseInt(page);
+    const limitNum = parseInt(limit);
+    const skip = (pageNum - 1) * limitNum;
+
+    const [total, leads] = await Promise.all([
+      Lead.countDocuments(filter),
+      Lead.find(filter)
+        .populate("assigned_to", "name email")
+        .populate("campaign", "name")
+        .sort(sort)
+        .skip(skip)
+        .limit(limitNum)
+        .lean(),
+    ]);
+
+    res.status(200).json({
+      success: true,
+      count: leads.length,
+      total,
+      page: pageNum,
+      totalPages: Math.ceil(total / limitNum),
+      limit: limitNum,
+      data: leads,
+    });
+  } catch (error) {
+    console.error("Error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Server error",
+    });
+  }
+};
 /**
  * @route   GET /api/leads/filter-all
  * @desc    Filter ALL leads without pagination (for export)
@@ -856,6 +959,215 @@ exports.filterAllLeads = async (req, res) => {
     });
   } catch (error) {
     console.error("Filter all leads error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to filter leads",
+      error: process.env.NODE_ENV === "development" ? error.message : undefined,
+    });
+  }
+};
+exports.managerFilterAllLeads = async (req, res) => {
+  try {
+    console.log("Manager filter all leads request received:", req.query);
+
+    const userId = req.user._id;
+    const companyId = req.user.companyId;
+    const userRole = req.user.role;
+
+    if (!companyId) {
+      return res.status(403).json({
+        success: false,
+        message: "Access denied: User is not associated with any company",
+      });
+    }
+
+    // Find all campaigns where this user is manager
+    const campaigns = await Campaign.find({
+      manager: userId,
+      companyId: companyId,
+    }).select("_id name");
+
+    if (campaigns.length === 0) {
+      return res.status(200).json({
+        success: true,
+        message: "No campaigns found for this manager",
+        count: 0,
+        data: [],
+      });
+    }
+
+    const campaignIds = campaigns.map((campaign) => campaign._id);
+
+    const {
+      sortBy = "created",
+      sortOrder = "desc",
+      search = "",
+      leadStatus,
+      leadSource,
+      tag,
+      startDate,
+      endDate,
+      dateRange,
+      ...otherFilters
+    } = req.query;
+
+    // Build filter query
+    let filter = {
+      companyId: companyId,
+      campaign: { $in: campaignIds }, // Filter by manager's campaigns
+      isDeleted: false,
+    };
+
+    // Apply additional filters
+    if (leadStatus) {
+      filter.leadStatus = leadStatus;
+    }
+
+    if (leadSource) {
+      filter.leadSource = leadSource;
+    }
+
+    if (tag) {
+      filter.tag = tag;
+    }
+
+    // Handle date range
+    if (startDate || endDate) {
+      filter.created = {};
+      if (startDate) filter.created.$gte = new Date(startDate);
+      if (endDate) filter.created.$lte = new Date(endDate);
+    }
+
+    // Handle dateRange parameter
+    if (dateRange && dateRange !== "all") {
+      const now = new Date();
+      let startDateRange, endDateRange;
+
+      switch (dateRange) {
+        case "today":
+          startDateRange = new Date(now.setHours(0, 0, 0, 0));
+          endDateRange = new Date(now.setHours(23, 59, 59, 999));
+          break;
+        case "yesterday":
+          const yesterday = new Date(now);
+          yesterday.setDate(yesterday.getDate() - 1);
+          startDateRange = new Date(yesterday.setHours(0, 0, 0, 0));
+          endDateRange = new Date(yesterday.setHours(23, 59, 59, 999));
+          break;
+        case "thisWeek":
+          const firstDayOfWeek = new Date(
+            now.setDate(now.getDate() - now.getDay()),
+          );
+          startDateRange = new Date(firstDayOfWeek.setHours(0, 0, 0, 0));
+          endDateRange = new Date();
+          break;
+        case "thisMonth":
+          startDateRange = new Date(now.getFullYear(), now.getMonth(), 1);
+          endDateRange = new Date();
+          break;
+        case "lastMonth":
+          startDateRange = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+          endDateRange = new Date(now.getFullYear(), now.getMonth(), 0);
+          break;
+      }
+
+      if (startDateRange && endDateRange) {
+        filter.created = {
+          $gte: startDateRange,
+          $lte: endDateRange,
+        };
+      }
+    }
+
+    // Search filter
+    if (search) {
+      const searchRegex = new RegExp(search, "i");
+      filter.$or = [
+        { firstName: searchRegex },
+        { lastName: searchRegex },
+        { email: searchRegex },
+        { phone: searchRegex },
+        { alt_phone: searchRegex },
+      ];
+    }
+
+    // Apply other valid filters
+    const validLeadFields = [
+      "firstName",
+      "lastName",
+      "email",
+      "phone",
+      "alt_phone",
+      "leadSource",
+      "tag",
+      "platform",
+      "activity",
+      "leadStatus",
+      "assigned_to",
+      "assigned_by",
+      "expectedValue",
+      "last_contacted_date",
+      "next_followup_date",
+      "star",
+    ];
+
+    Object.keys(otherFilters).forEach((key) => {
+      if (
+        validLeadFields.includes(key) &&
+        otherFilters[key] !== undefined &&
+        otherFilters[key] !== ""
+      ) {
+        filter[key] = otherFilters[key];
+      }
+    });
+
+    // Build sort
+    const sort = {};
+    const sortFieldMap = {
+      created: "created",
+      updated: "updated",
+      firstName: "firstName",
+      lastName: "lastName",
+      email: "email",
+      leadStatus: "leadStatus",
+      star: "star",
+    };
+
+    const actualSortBy = sortFieldMap[sortBy] || "created";
+    sort[actualSortBy] = sortOrder === "asc" ? 1 : -1;
+
+    console.log(
+      "Filter for manager all leads:",
+      JSON.stringify(filter, null, 2),
+    );
+
+    // Fetch ALL leads without pagination
+    const leads = await Lead.find(filter)
+      .populate("assigned_to", "name email")
+      .populate({
+        path: "campaign",
+        select: "name manager",
+        populate: {
+          path: "manager",
+          select: "name email",
+        },
+      })
+      .sort(sort)
+      .lean();
+
+    console.log(
+      `Found ${leads.length} leads for manager ${userId} across ${campaigns.length} campaigns`,
+    );
+
+    res.status(200).json({
+      success: true,
+      count: leads.length,
+      data: leads,
+      campaigns: campaigns, // Optional: include campaign info
+      message: `Found ${leads.length} leads across ${campaigns.length} campaigns`,
+    });
+  } catch (error) {
+    console.error("Manager filter all leads error:", error);
     res.status(500).json({
       success: false,
       message: "Failed to filter leads",

@@ -54,9 +54,9 @@ exports.createAdmin = async (req, res) => {
  * @desc    Admin creates Salesperson
  * @access  Admin
  */
-exports.createSalesperson = async (req, res) => {
+exports.createUser = async (req, res) => {
   try {
-    const { name, email, password, mobile, city } = req.body;
+    const { name, email, password, mobile, city, role } = req.body;
 
     if (!name || !email || !password) {
       return res.status(400).json({
@@ -73,20 +73,20 @@ exports.createSalesperson = async (req, res) => {
       });
     }
 
-    const salesperson = await User.create({
+    const UserData = await User.create({
       companyId: req.user.companyId, // Admin’s company
       name,
       email,
       password,
       mobile,
       city,
-      role: ROLES.MANAGER,
+      role,
     });
 
     res.status(201).json({
       success: true,
-      message: "Salesperson created successfully",
-      data: salesperson,
+      message: "User created successfully",
+      data: UserData,
     });
   } catch (error) {
     console.error(error);
@@ -131,27 +131,45 @@ exports.getAdmins = async (req, res) => {
     res.status(500).json({ success: false, message: "Server error" });
   }
 };
-
-/**
- * @route   GET /api/users
- * @desc    Get users
- * @access  Admin, SuperAdmin
- */
 exports.getUsers = async (req, res) => {
   try {
     let query = {};
 
-    // Admin can only see users from their company
-    if (req.user.role === ROLES.ADMIN) {
+    console.log('📋 User requesting:', {
+      role: req.user.role,
+      companyId: req.user.companyId,
+      userId: req.user._id
+    });
+
+    // Manager can only see salespersons in their company
+    if (req.user.role == ROLES.MANAGER) {
       query = {
         companyId: req.user.companyId,
-        role: { $in: [ROLES.SALESPERSON, ROLES.MANAGER] } // Show both salespersons and managers
+        role: ROLES.SALESPERSON, // Managers only see salespersons
+        isActive: true // Optional: only active users
       };
+      console.log('👔 MANAGER query:', query);
     }
-
+    // Admin can only see users from their company
+    else if (req.user.role == ROLES.ADMIN) {
+      query = {
+        companyId: req.user.companyId,
+        role: { $in: [ROLES.SALESPERSON, ROLES.MANAGER] }
+      };
+      console.log('👨‍💼 ADMIN query:', query);
+    }
     // SuperAdmin can see all users except other superadmins
-    if (req.user.role === ROLES.SUPERADMIN) {
+    else if (req.user.role == ROLES.SUPERADMIN) {
       query.role = { $ne: ROLES.SUPERADMIN };
+      console.log('👑 SUPERADMIN query:', query);
+    }
+    // Other roles get no access
+    else {
+      console.log('🚫 No access for role:', req.user.role);
+      return res.status(403).json({
+        success: false,
+        message: "Access denied"
+      });
     }
 
     const users = await User.find(query)
@@ -159,13 +177,16 @@ exports.getUsers = async (req, res) => {
       .populate("companyId", "name")
       .sort({ createdTime: -1 });
 
+    console.log(`✅ Found ${users.length} users for ${req.user.role}`);
+
     res.status(200).json({
       success: true,
       count: users.length,
       data: users,
+      role: req.user.role
     });
   } catch (error) {
-    console.error(error);
+    console.error('❌ Error:', error);
     res.status(500).json({
       success: false,
       message: "Server error",
@@ -209,6 +230,35 @@ exports.getUserById = async (req, res) => {
     res.status(500).json({
       success: false,
       message: "Server error",
+    });
+  }
+};
+exports.getSelfProfile = async (req, res) => {
+  try {
+
+    const userId=req.user._id;
+    console.log(userId);
+
+     const user = await User.findById(userId);
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found",
+      });
+    }
+
+    // Check permissions
+    
+    res.status(200).json({
+      success: true,
+      data: user,
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({
+      success: false,
+      message: "server error", 
     });
   }
 };

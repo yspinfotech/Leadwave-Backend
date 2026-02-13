@@ -6,13 +6,14 @@ const auth = require("../middleware/auth");
 const authorize = require("../middleware/authorize");
 const {
   createAdmin,
-  createSalesperson,
+  createUser,
   getAdmins,
   getUsers,
   getUserById,
   getSalesUsersForAssignment,
   deleteUser,
   updateUser,
+  getSelfProfile
 } = require("../controllers/userController");
 
 const ROLES = require("../config/roles");
@@ -35,7 +36,7 @@ router.get("/admins", auth, authorize(ROLES.SUPERADMIN), getAdmins);
  * @desc    Admin creates Salesperson
  * @access  Admin
  */
-router.post("/salesperson", auth, authorize(ROLES.ADMIN), createSalesperson);
+router.post("/create", auth, authorize(ROLES.ADMIN), createUser);
 
 /**
  * @route   GET /api/users
@@ -43,7 +44,7 @@ router.post("/salesperson", auth, authorize(ROLES.ADMIN), createSalesperson);
  * @access  Admin, SuperAdmin
  */
 // FIX: Use spread operator
-router.get("/", auth, authorize(ROLES.ADMIN, ROLES.SUPERADMIN), getUsers);
+router.get("/", auth, authorize(ROLES.ADMIN, ROLES.SUPERADMIN, ROLES.MANAGER), getUsers);
 
 /**
  * @route   GET /api/users/:id
@@ -51,7 +52,9 @@ router.get("/", auth, authorize(ROLES.ADMIN, ROLES.SUPERADMIN), getUsers);
  * @access  Admin, SuperAdmin
  */
 // FIX: Use spread operator
-router.get("/:id", auth, authorize(ROLES.ADMIN, ROLES.SUPERADMIN), getUserById);
+router.get("/:id", auth, authorize(ROLES.ADMIN, ROLES.SUPERADMIN, ROLES.MANAGER), getUserById);
+
+router.get("/current/profile",auth,authorize(ROLES.ADMIN, ROLES.SUPERADMIN, ROLES.MANAGER,ROLES.SALESPERSON),  getSelfProfile);
 
 /**
  * @route   PUT /api/users/:id

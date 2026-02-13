@@ -167,6 +167,59 @@ exports.getCallsBySalesperson = async (req, res) => {
   }
 };
 
+exports.getCallsReports = async (req, res) => {
+  try {
+  
+    const  userId  = req.user._id;
+   
+    const { start, end, page = 1, limit = 50 } = req.query;
+
+    if (!mongoose.Types.ObjectId.isValid(userId)) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Invalid userId" });
+    }
+
+    const user = await User.findById(userId);
+    if (!user)
+      return res
+        .status(404)
+        .json({ success: false, message: "User not found" });
+
+    const companyId = req.user.companyId;
+    const filter = { userId, companyId };
+
+    if (start) {
+      filter.callTime = filter.callTime || {};
+      filter.callTime.$gte = new Date(start);
+    }
+    if (end) {
+      filter.callTime = filter.callTime || {};
+      filter.callTime.$lte = new Date(end);
+    }
+
+    const skip = (parseInt(page, 10) - 1) * parseInt(limit, 10);
+    const [total, calls] = await Promise.all([
+      CallLog.countDocuments(filter),
+      CallLog.find(filter)
+        .populate("userId", "name email mobile role")
+        .populate("leadId")
+        .sort({ callTime: -1 })
+        .skip(skip)
+        .limit(parseInt(limit, 10)),
+    ]);
+
+    return res.status(200).json({
+      success: true,
+      data: calls,
+      meta: { page: parseInt(page, 10), limit: parseInt(limit, 10), total },
+    });
+  } catch (error) {
+    console.error("Get Calls By Salesperson Error:", error);
+    return res.status(500).json({ success: false, message: "Server error" });
+  }
+};
+
 // GET /api/calls
 // Admin overview: filter by date range, salesperson, lead
 exports.getCalls = async (req, res) => {
