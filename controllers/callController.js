@@ -13,53 +13,142 @@ cloudinary.config({
   api_secret: process.env.CLOUDINARY_API_SECRET,
 });
 
+// exports.createCall = async (req, res) => {
+//   try {
+//     // When using FormData/Multer, text fields are in req.body
+//     let { leadId, callTime, durationSeconds, callStatus, callType, notes } =
+//       req.body;
+
+//     let recordingLink = req.body.recordingLink || null;
+
+//     // 1. Handle File Upload to Cloudinary if a file is present
+//     if (req.file) {
+//       try {
+//         const result = await cloudinary.uploader.upload(req.file.path, {
+//           resource_type: "video", // 'video' handles audio files in Cloudinary
+//           folder: "call_recordings",
+//         });
+//         recordingLink = result.secure_url;
+
+//         // Delete local temp file
+//         fs.unlinkSync(req.file.path);
+//       } catch (uploadError) {
+//         console.error("Cloudinary Upload Error:", uploadError);
+//         // Fallback or handle error
+//       }
+//     }
+
+//     if (!leadId)
+//       return res
+//         .status(400)
+//         .json({ success: false, message: "leadId is required" });
+
+//     // ... (Validation and Lead Checks - Keep your existing logic) ...
+//     const lead = await Lead.findOne({ _id: leadId, isDeleted: false });
+//     if (!lead)
+//       return res
+//         .status(404)
+//         .json({ success: false, message: "Lead not found" });
+
+//     // 2. Create the Call Log with the new Recording Link
+//     const callLog = await CallLog.create({
+//       leadId,
+//       userId: req.user._id,
+//       companyId: req.user.companyId,
+//       callTime: callTime ? new Date(callTime) : new Date(),
+//       durationSeconds: parseInt(durationSeconds) || 0,
+//       callStatus: callStatus || null,
+//       callType: callType || null,
+//       recordingLink: recordingLink, // This will now be the Cloudinary URL
+//       notes: notes || "",
+//     });
+
+//     return res.status(201).json({ success: true, data: callLog });
+//   } catch (error) {
+//     console.error("Create Call Error:", error);
+//     return res.status(500).json({ success: false, message: "Server error" });
+//   }
+// };
+
+
+
 exports.createCall = async (req, res) => {
   try {
-    // When using FormData/Multer, text fields are in req.body
     let { leadId, callTime, durationSeconds, callStatus, callType, notes } =
       req.body;
 
     let recordingLink = req.body.recordingLink || null;
 
-    // 1. Handle File Upload to Cloudinary if a file is present
-    if (req.file) {
-      try {
-        const result = await cloudinary.uploader.upload(req.file.path, {
-          resource_type: "video", // 'video' handles audio files in Cloudinary
-          folder: "call_recordings",
-        });
-        recordingLink = result.secure_url;
-
-        // Delete local temp file
-        fs.unlinkSync(req.file.path);
-      } catch (uploadError) {
-        console.error("Cloudinary Upload Error:", uploadError);
-        // Fallback or handle error
-      }
-    }
-
+    // Validate leadId
     if (!leadId)
       return res
         .status(400)
         .json({ success: false, message: "leadId is required" });
 
-    // ... (Validation and Lead Checks - Keep your existing logic) ...
+    // Parse values
+    const parsedCallTime = callTime ? new Date(callTime) : new Date();
+    const parsedDuration = parseInt(durationSeconds) || 0;
+
+    // 🛑 DUPLICATE CHECK: Same lead, same day (start to end), exact same time, same duration
+    const startOfDay = new Date(parsedCallTime);
+    startOfDay.setHours(0, 0, 0, 0);
+    
+    const endOfDay = new Date(parsedCallTime);
+    endOfDay.setHours(23, 59, 59, 999);
+
+    // Check for existing call with exact same parameters
+    const existingCall = await CallLog.findOne({
+      leadId: leadId,
+      callTime: parsedCallTime, // Exact same timestamp
+      durationSeconds: parsedDuration,
+      // Optional: Add this to ensure it's within same day (though callTime already ensures)
+      callTime: { $gte: startOfDay, $lte: endOfDay }
+    });
+
+    if (existingCall) {
+      return res.status(409).json({ 
+        success: true, 
+        error: "Call log already exists for this lead at this exact time with same duration",
+        existingCall: {
+          id: existingCall._id,
+          callTime: existingCall.callTime,
+          durationSeconds: existingCall.durationSeconds
+        }
+      });
+    }
+
+    // Check if lead exists
     const lead = await Lead.findOne({ _id: leadId, isDeleted: false });
     if (!lead)
       return res
         .status(404)
         .json({ success: false, message: "Lead not found" });
 
-    // 2. Create the Call Log with the new Recording Link
+    // Handle File Upload to Cloudinary if a file is present
+    if (req.file) {
+      try {
+        const result = await cloudinary.uploader.upload(req.file.path, {
+          resource_type: "video",
+          folder: "call_recordings",
+        });
+        recordingLink = result.secure_url;
+        fs.unlinkSync(req.file.path);
+      } catch (uploadError) {
+        console.error("Cloudinary Upload Error:", uploadError);
+        // Continue without recording if upload fails
+      }
+    }
+
+    // Create the Call Log
     const callLog = await CallLog.create({
       leadId,
       userId: req.user._id,
       companyId: req.user.companyId,
-      callTime: callTime ? new Date(callTime) : new Date(),
-      durationSeconds: parseInt(durationSeconds) || 0,
+      callTime: parsedCallTime,
+      durationSeconds: parsedDuration,
       callStatus: callStatus || null,
       callType: callType || null,
-      recordingLink: recordingLink, // This will now be the Cloudinary URL
+      recordingLink: recordingLink,
       notes: notes || "",
     });
 
@@ -72,92 +161,6 @@ exports.createCall = async (req, res) => {
 
 
 
-// exports.createCall = async (req, res) => {
-//   try {
-//     let { leadId, callTime, durationSeconds, callStatus, callType, notes } =
-//       req.body;
-
-//     let recordingLink = req.body.recordingLink || null;
-
-//     // Validate leadId
-//     if (!leadId)
-//       return res
-//         .status(400)
-//         .json({ success: false, message: "leadId is required" });
-
-//     // Parse values
-//     const parsedCallTime = callTime ? new Date(callTime) : new Date();
-//     const parsedDuration = parseInt(durationSeconds) || 0;
-
-//     // 🛑 DUPLICATE CHECK: Same lead, same day (start to end), exact same time, same duration
-//     const startOfDay = new Date(parsedCallTime);
-//     startOfDay.setHours(0, 0, 0, 0);
-    
-//     const endOfDay = new Date(parsedCallTime);
-//     endOfDay.setHours(23, 59, 59, 999);
-
-//     // Check for existing call with exact same parameters
-//     const existingCall = await CallLog.findOne({
-//       leadId: leadId,
-//       callTime: parsedCallTime, // Exact same timestamp
-//       durationSeconds: parsedDuration,
-//       // Optional: Add this to ensure it's within same day (though callTime already ensures)
-//       callTime: { $gte: startOfDay, $lte: endOfDay }
-//     });
-
-//     if (existingCall) {
-//       return res.status(409).json({ 
-//         success: false, 
-//         message: "Call log already exists for this lead at this exact time with same duration",
-//         existingCall: {
-//           id: existingCall._id,
-//           callTime: existingCall.callTime,
-//           durationSeconds: existingCall.durationSeconds
-//         }
-//       });
-//     }
-
-//     // Check if lead exists
-//     const lead = await Lead.findOne({ _id: leadId, isDeleted: false });
-//     if (!lead)
-//       return res
-//         .status(404)
-//         .json({ success: false, message: "Lead not found" });
-
-//     // Handle File Upload to Cloudinary if a file is present
-//     if (req.file) {
-//       try {
-//         const result = await cloudinary.uploader.upload(req.file.path, {
-//           resource_type: "video",
-//           folder: "call_recordings",
-//         });
-//         recordingLink = result.secure_url;
-//         fs.unlinkSync(req.file.path);
-//       } catch (uploadError) {
-//         console.error("Cloudinary Upload Error:", uploadError);
-//         // Continue without recording if upload fails
-//       }
-//     }
-
-//     // Create the Call Log
-//     const callLog = await CallLog.create({
-//       leadId,
-//       userId: req.user._id,
-//       companyId: req.user.companyId,
-//       callTime: parsedCallTime,
-//       durationSeconds: parsedDuration,
-//       callStatus: callStatus || null,
-//       callType: callType || null,
-//       recordingLink: recordingLink,
-//       notes: notes || "",
-//     });
-
-//     return res.status(201).json({ success: true, data: callLog });
-//   } catch (error) {
-//     console.error("Create Call Error:", error);
-//     return res.status(500).json({ success: false, message: "Server error" });
-//   }
-// };
 // GET /api/calls/lead/:leadId
 // Get all calls for a lead (company-scoped). Salesperson can access only if assigned, Admin can access all.
 exports.getCallsByLead = async (req, res) => {
@@ -258,11 +261,12 @@ exports.getCallsBySalesperson = async (req, res) => {
 
 exports.getCallsReports = async (req, res) => {
   try {
-  
-    const  userId  = req.user._id;
-   
+    const userId = req.user._id;
     const { start, end, page = 1, limit = 50 } = req.query;
 
+    console.log("Start:", start);
+    console.log("End:", end);
+    
     if (!mongoose.Types.ObjectId.isValid(userId)) {
       return res
         .status(400)
@@ -278,14 +282,26 @@ exports.getCallsReports = async (req, res) => {
     const companyId = req.user.companyId;
     const filter = { userId, companyId };
 
+    // Handle date filtering properly for full-day ranges
     if (start) {
       filter.callTime = filter.callTime || {};
-      filter.callTime.$gte = new Date(start);
+      
+      // Create start date (beginning of the day in UTC)
+      const startDate = new Date(start);
+      startDate.setUTCHours(0, 0, 0, 0);
+      filter.callTime.$gte = startDate;
     }
+    
     if (end) {
       filter.callTime = filter.callTime || {};
-      filter.callTime.$lte = new Date(end);
+      
+      // Create end date (end of the day in UTC)
+      const endDate = new Date(end);
+      endDate.setUTCHours(23, 59, 59, 999);
+      filter.callTime.$lte = endDate;
     }
+
+    console.log("Filter:", JSON.stringify(filter, null, 2));
 
     const skip = (parseInt(page, 10) - 1) * parseInt(limit, 10);
     const [total, calls] = await Promise.all([

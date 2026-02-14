@@ -642,7 +642,6 @@ exports.createAndAssignLead = async (req, res) => {
     const leadData = {
       firstName,
       lastName,
-      
       phone,
       alt_phone,
       tag,
