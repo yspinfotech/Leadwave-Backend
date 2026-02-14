@@ -4,11 +4,11 @@ const { LEAD_SOURCE, LEAD_STATUS } = require("../config/leadEnums");
 
 const NoteSchema = new mongoose.Schema(
   {
-     callId: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "CallLog",
-      required: true,
-    },
+    //  callId: {
+    //   type: mongoose.Schema.Types.ObjectId,
+    //   ref: "CallLog",
+    //   required: true,
+    // },
     
     note_desc: {
       type: String,

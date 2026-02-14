@@ -69,6 +69,95 @@ exports.createCall = async (req, res) => {
     return res.status(500).json({ success: false, message: "Server error" });
   }
 };
+
+
+
+// exports.createCall = async (req, res) => {
+//   try {
+//     let { leadId, callTime, durationSeconds, callStatus, callType, notes } =
+//       req.body;
+
+//     let recordingLink = req.body.recordingLink || null;
+
+//     // Validate leadId
+//     if (!leadId)
+//       return res
+//         .status(400)
+//         .json({ success: false, message: "leadId is required" });
+
+//     // Parse values
+//     const parsedCallTime = callTime ? new Date(callTime) : new Date();
+//     const parsedDuration = parseInt(durationSeconds) || 0;
+
+//     // 🛑 DUPLICATE CHECK: Same lead, same day (start to end), exact same time, same duration
+//     const startOfDay = new Date(parsedCallTime);
+//     startOfDay.setHours(0, 0, 0, 0);
+    
+//     const endOfDay = new Date(parsedCallTime);
+//     endOfDay.setHours(23, 59, 59, 999);
+
+//     // Check for existing call with exact same parameters
+//     const existingCall = await CallLog.findOne({
+//       leadId: leadId,
+//       callTime: parsedCallTime, // Exact same timestamp
+//       durationSeconds: parsedDuration,
+//       // Optional: Add this to ensure it's within same day (though callTime already ensures)
+//       callTime: { $gte: startOfDay, $lte: endOfDay }
+//     });
+
+//     if (existingCall) {
+//       return res.status(409).json({ 
+//         success: false, 
+//         message: "Call log already exists for this lead at this exact time with same duration",
+//         existingCall: {
+//           id: existingCall._id,
+//           callTime: existingCall.callTime,
+//           durationSeconds: existingCall.durationSeconds
+//         }
+//       });
+//     }
+
+//     // Check if lead exists
+//     const lead = await Lead.findOne({ _id: leadId, isDeleted: false });
+//     if (!lead)
+//       return res
+//         .status(404)
+//         .json({ success: false, message: "Lead not found" });
+
+//     // Handle File Upload to Cloudinary if a file is present
+//     if (req.file) {
+//       try {
+//         const result = await cloudinary.uploader.upload(req.file.path, {
+//           resource_type: "video",
+//           folder: "call_recordings",
+//         });
+//         recordingLink = result.secure_url;
+//         fs.unlinkSync(req.file.path);
+//       } catch (uploadError) {
+//         console.error("Cloudinary Upload Error:", uploadError);
+//         // Continue without recording if upload fails
+//       }
+//     }
+
+//     // Create the Call Log
+//     const callLog = await CallLog.create({
+//       leadId,
+//       userId: req.user._id,
+//       companyId: req.user.companyId,
+//       callTime: parsedCallTime,
+//       durationSeconds: parsedDuration,
+//       callStatus: callStatus || null,
+//       callType: callType || null,
+//       recordingLink: recordingLink,
+//       notes: notes || "",
+//     });
+
+//     return res.status(201).json({ success: true, data: callLog });
+//   } catch (error) {
+//     console.error("Create Call Error:", error);
+//     return res.status(500).json({ success: false, message: "Server error" });
+//   }
+// };
 // GET /api/calls/lead/:leadId
 // Get all calls for a lead (company-scoped). Salesperson can access only if assigned, Admin can access all.
 exports.getCallsByLead = async (req, res) => {

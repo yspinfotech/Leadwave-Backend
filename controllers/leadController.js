@@ -549,7 +549,9 @@ exports.checkLeadByPhone = async (req, res) => {
     });
 
     if (!lead) {
-      return res.status(200).json({ success: true, notexist: true });
+      return res.status(200).json({ success: true, notexist: true ,
+        message:"Add this lead"
+      });
     }
 
     if (!lead.assigned_to) {
@@ -582,14 +584,18 @@ exports.createAndAssignLead = async (req, res) => {
       firstName,
       lastName,
       phone,
-      email = null,
+      email,
       alt_phone = null,
-      tag,
-      activity,
-      platform,
       leadSource = LEAD_SOURCE.MANUAL || "manual",
-      assignedTo,
+      campaign
     } = req.body;
+    if(!email){
+      email=null;
+    }
+    const tag="organic";
+     const activity="other";
+     const platform="other";
+    const assignedTo=req.user._id;
 
     if (!firstName || !lastName || !phone) {
       return res.status(400).json({
@@ -649,6 +655,7 @@ exports.createAndAssignLead = async (req, res) => {
       companyId: req.user.companyId,
       assigned_to: assigneeId,
       assigned_by: assigneeId ? req.user._id : null,
+      campaign
     };
 
     const lead = await Lead.create(leadData);
@@ -679,11 +686,11 @@ exports.createAndAssignLead = async (req, res) => {
  */
 exports.assignLeadToSelf = async (req, res) => {
   try {
-    const { leadId, phone } = req.body;
-    if (!leadId && !phone) {
+    const { leadId } = req.body;
+    if (!leadId ) {
       return res
         .status(400)
-        .json({ success: false, message: "leadId or phone required" });
+        .json({ success: false, message: "Lead is required" });
     }
 
     const filter = {
@@ -708,7 +715,6 @@ exports.assignLeadToSelf = async (req, res) => {
     lead.assigned_to = req.user._id;
     lead.assigned_by = req.user._id;
     await lead.save();
-
     res
       .status(200)
       .json({ success: true, message: "Assigned to self", data: lead });
