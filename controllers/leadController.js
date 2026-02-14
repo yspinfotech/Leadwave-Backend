@@ -584,14 +584,12 @@ exports.createAndAssignLead = async (req, res) => {
       firstName,
       lastName,
       phone,
-      email,
+      
       alt_phone = null,
       leadSource = LEAD_SOURCE.MANUAL || "manual",
       campaign
     } = req.body;
-    if(!email){
-      email=null;
-    }
+ 
     const tag="organic";
      const activity="other";
      const platform="other";
